@@ -82,11 +82,19 @@ testRawConnection();
 // ============================================
 // SESSION & PASSPORT CONFIGURATION
 // ============================================
-// Create a connection URI with SSL parameters
-const connectionUri = `mysql://${encodeURIComponent(process.env.DB_USER)}:${encodeURIComponent(process.env.DB_PASSWORD)}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}?ssl={"rejectUnauthorized":true}`;
+// Debug: Check environment variables
+console.log('========== SESSION STORE DEBUG ==========');
+console.log('DB_HOST:', process.env.DB_HOST || '❌ NOT SET');
+console.log('DB_PORT:', process.env.DB_PORT || '❌ NOT SET');
+console.log('DB_USER:', process.env.DB_USER || '❌ NOT SET');
+console.log('DB_NAME:', process.env.DB_NAME || '❌ NOT SET');
+console.log('DB_PASSWORD exists:', process.env.DB_PASSWORD ? '✅ YES' : '❌ NO');
+console.log('=========================================');
 
-console.log('🔌 Connecting to session store via URI (password hidden)');
-console.log('URI:', connectionUri.replace(process.env.DB_PASSWORD, '****'));
+// Create a connection URI with SSL parameters
+const connectionUri = `mysql://${encodeURIComponent(process.env.DB_USER)}:${encodeURIComponent(process.env.DB_PASSWORD)}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}?ssl={"rejectUnauthorized":true,"minVersion":"TLSv1.2"}`;
+
+console.log('🔌 Connection URI (password hidden):', connectionUri.replace(process.env.DB_PASSWORD, '****'));
 
 // MySQL session store using connection URI
 const sessionStore = new MySQLStore({
@@ -102,9 +110,58 @@ const sessionStore = new MySQLStore({
     },
     // Additional connection options
     connectionLimit: 5,
-    connectTimeout: 20000,
-    acquireTimeout: 20000
+    connectTimeout: 30000,
+    acquireTimeout: 30000
 });
+
+// Also try creating a test connection to verify
+const testConnection = async () => {
+    try {
+        const mysql = require('mysql2/promise');
+        const testConn = await mysql.createConnection({
+            host: process.env.DB_HOST,
+            port: process.env.DB_PORT,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME,
+            ssl: {
+                rejectUnauthorized: true,
+                minVersion: 'TLSv1.2'
+            }
+        });
+        console.log('✅ Test connection successful to:', process.env.DB_HOST);
+        await testConn.end();
+    } catch (error) {
+        console.error('❌ Test connection failed:', error.message);
+    }
+};
+testConnection();
+
+// Session configuration
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
+    store: sessionStore,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 1000 * 60 * 60 * 24
+    }
+}));
+
+// Session configuration
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
+    store: sessionStore,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 1000 * 60 * 60 * 24
+    }
+}));
 
 // Session configuration
 app.use(session({
