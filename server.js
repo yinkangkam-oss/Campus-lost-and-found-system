@@ -11,7 +11,7 @@ const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
 const MySQLStore = require('express-mysql-session')(session);
-const mysql = require('mysql2/promise'); // Added for raw connection test
+const mysql = require('mysql2/promise');
 
 // Load environment variables
 dotenv.config();
@@ -72,11 +72,15 @@ const testRawConnection = async () => {
         });
         console.log('✅ Raw MySQL connection successful!');
         await connection.end();
+        return true;
     } catch (error) {
         console.error('❌ Raw MySQL connection failed:', error.message);
         console.error('Error code:', error.code);
+        return false;
     }
 };
+
+// Run raw connection test
 testRawConnection();
 
 // ============================================
@@ -91,14 +95,14 @@ console.log('DB_NAME:', process.env.DB_NAME || '❌ NOT SET');
 console.log('DB_PASSWORD exists:', process.env.DB_PASSWORD ? '✅ YES' : '❌ NO');
 console.log('=========================================');
 
-// Create a connection URI with SSL parameters
-const connectionUri = `mysql://${encodeURIComponent(process.env.DB_USER)}:${encodeURIComponent(process.env.DB_PASSWORD)}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}?ssl={"rejectUnauthorized":true,"minVersion":"TLSv1.2"}`;
-
-console.log('🔌 Connection URI (password hidden):', connectionUri.replace(process.env.DB_PASSWORD, '****'));
-
-// MySQL session store using connection URI
+// Create MySQL session store with explicit options (not URI)
+console.log('📦 Creating MySQL session store...');
 const sessionStore = new MySQLStore({
-    connection: connectionUri,
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
     createDatabaseTable: true,
     schema: {
         tableName: 'sessions',
@@ -108,74 +112,18 @@ const sessionStore = new MySQLStore({
             data: 'data'
         }
     },
-    // Additional connection options
+    // SSL configuration for TiDB Cloud
+    ssl: {
+        rejectUnauthorized: true,
+        minVersion: 'TLSv1.2'
+    },
+    // Connection pool settings
     connectionLimit: 5,
     connectTimeout: 30000,
     acquireTimeout: 30000
 });
 
-// Also try creating a test connection to verify
-const testConnection = async () => {
-    try {
-        const mysql = require('mysql2/promise');
-        const testConn = await mysql.createConnection({
-            host: process.env.DB_HOST,
-            port: process.env.DB_PORT,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME,
-            ssl: {
-                rejectUnauthorized: true,
-                minVersion: 'TLSv1.2'
-            }
-        });
-        console.log('✅ Test connection successful to:', process.env.DB_HOST);
-        await testConn.end();
-    } catch (error) {
-        console.error('❌ Test connection failed:', error.message);
-    }
-};
-testConnection();
-
-// Session configuration
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
-    store: sessionStore,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24
-    }
-}));
-
-// Session configuration
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
-    store: sessionStore,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24
-    }
-}));
-
-// Session configuration
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
-    store: sessionStore,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24
-    }
-}));
-// Session configuration
+// Session configuration - ONLY ONCE!
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
     store: sessionStore,
@@ -187,6 +135,8 @@ app.use(session({
         maxAge: 1000 * 60 * 60 * 24 // 24 hours
     }
 }));
+
+console.log('✅ Session store configured');
 
 // Passport initialization
 app.use(passport.initialize());
@@ -328,5 +278,5 @@ app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🔧 Trust proxy: enabled`);
-    console.log(`💾 Session store: MySQL with enhanced SSL`);
+    console.log(`💾 Session store: MySQL with SSL`);
 });
