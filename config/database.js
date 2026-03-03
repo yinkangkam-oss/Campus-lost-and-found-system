@@ -10,7 +10,7 @@ const pool = mysql.createPool({
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'lost_found_db',
-    port: process.env.DB_PORT || 3306,
+    port: process.env.DB_PORT || 3306,  // This will use 4000 from env variables
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
@@ -26,9 +26,9 @@ const pool = mysql.createPool({
 const initializeDatabase = async () => {
     try {
         const connection = await pool.getConnection();
-        console.log('✅ Database connected successfully');
+        console.log('✅ Database connected successfully to:', process.env.DB_HOST);
         
-        // First, check if we need to create users table
+        // Create users table
         await connection.execute(`
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -41,8 +41,9 @@ const initializeDatabase = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
+        console.log('✅ Users table ready');
         
-        // Create items table if it doesn't exist
+        // Create items table
         await connection.execute(`
             CREATE TABLE IF NOT EXISTS items (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -63,31 +64,12 @@ const initializeDatabase = async () => {
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
-        
-        // Check if image_path column exists (for existing databases)
-        const [columns] = await connection.execute(`
-            SELECT COLUMN_NAME 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_NAME = 'items' 
-            AND COLUMN_NAME = 'image_path'
-            AND TABLE_SCHEMA = ?
-        `, [process.env.DB_NAME || 'lost_found_db']);
-        
-        if (columns.length === 0) {
-            // Add image_path column if it doesn't exist
-            await connection.execute(`
-                ALTER TABLE items 
-                ADD COLUMN image_path VARCHAR(255) NULL AFTER contact_info
-            `);
-            console.log('Added image_path column to items table');
-        }
+        console.log('✅ Items table ready');
         
         connection.release();
         console.log('✅ Database initialized successfully');
     } catch (error) {
         console.error('❌ Database initialization error:', error);
-        console.error('Error code:', error.code);
-        console.error('Error message:', error.message);
         throw error;
     }
 };
