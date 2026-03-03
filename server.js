@@ -82,13 +82,15 @@ testRawConnection();
 // ============================================
 // SESSION & PASSPORT CONFIGURATION
 // ============================================
-// Enhanced MySQL session store with proper SSL for TiDB Cloud
+// Create a connection URI with SSL parameters
+const connectionUri = `mysql://${encodeURIComponent(process.env.DB_USER)}:${encodeURIComponent(process.env.DB_PASSWORD)}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}?ssl={"rejectUnauthorized":true}`;
+
+console.log('🔌 Connecting to session store via URI (password hidden)');
+console.log('URI:', connectionUri.replace(process.env.DB_PASSWORD, '****'));
+
+// MySQL session store using connection URI
 const sessionStore = new MySQLStore({
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
+    connection: connectionUri,
     createDatabaseTable: true,
     schema: {
         tableName: 'sessions',
@@ -98,17 +100,24 @@ const sessionStore = new MySQLStore({
             data: 'data'
         }
     },
-    // 🔐 CRITICAL: SSL configuration for TiDB Cloud
-    ssl: {
-        rejectUnauthorized: true,
-        minVersion: 'TLSv1.2'
-    },
     // Additional connection options
     connectionLimit: 5,
     connectTimeout: 20000,
     acquireTimeout: 20000
 });
 
+// Session configuration
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
+    store: sessionStore,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 1000 * 60 * 60 * 24
+    }
+}));
 // Session configuration
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
