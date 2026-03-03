@@ -1,0 +1,162 @@
+<!-- views/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Lost & Found - Quest International University</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style id="deferred-styles">
+        /* Additional styles can be loaded later */
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>
+                <img src="https://qiu.edu.my/wp-content/uploads/2022/03/QIU-Logo-opt.jpg" 
+                     alt="QIU Logo" 
+                     class="header-logo"
+                     onerror="this.onerror=null; this.src='https://via.placeholder.com/80x80/003366/ffffff?text=QIU'">
+                Campus Lost & Found
+            </h1>
+            <nav>
+                <ul>
+                    <li><a href="/" class="active"><i class="bi bi-house"></i> Home</a></li>
+                    <!-- UPDATED: Added onclick login check -->
+                    <li><a href="/add-item" onclick="return checkLoginBeforeReport(event);"><i class="bi bi-plus-circle"></i> Report Item</a></li>
+                    <li id="authLinks">
+                        <a href="/auth"><i class="bi bi-person"></i> Login</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <section>
+            <h2 class="section-title">
+                <i class="bi bi-clipboard-list"></i>
+                Lost & Found Items
+            </h2>
+
+            <!-- Search and Filter Section -->
+            <div class="filter-section">
+                <h3><i class="bi bi-search"></i> Search Items</h3>
+                
+                <!-- Search Bar -->
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <input type="text" 
+                           id="searchInput" 
+                           class="form-control" 
+                           placeholder="Search by title, description, or location..."
+                           style="flex: 1;">
+                    <button class="btn btn-primary" id="searchBtn">
+                        <i class="bi bi-search"></i> Search
+                    </button>
+                    <button class="btn btn-secondary" id="clearSearchBtn">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </button>
+                </div>
+
+                <!-- Advanced Filters Toggle -->
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-secondary" id="toggleFilters" style="width: 100%;">
+                        <i class="bi bi-funnel"></i> Advanced Filters
+                    </button>
+                </div>
+
+                <!-- Advanced Filters (hidden by default) -->
+                <div id="advancedFilters" style="display: none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label><i class="bi bi-tag"></i> Category</label>
+                            <select id="filterCategory" class="form-control">
+                                <option value="">All Categories</option>
+                                <option value="lost">Lost Items</option>
+                                <option value="found">Found Items</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="bi bi-info-circle"></i> Status</label>
+                            <select id="filterStatus" class="form-control">
+                                <option value="">All Status</option>
+                                <option value="active">Active</option>
+                                <option value="claimed">Claimed</option>
+                                <option value="resolved">Resolved</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label><i class="bi bi-calendar"></i> From Date</label>
+                            <input type="date" id="filterFromDate" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="bi bi-calendar"></i> To Date</label>
+                            <input type="date" id="filterToDate" class="form-control">
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px;">
+                        <button class="btn btn-primary" id="applyFiltersBtn">
+                            <i class="bi bi-check-circle"></i> Apply Filters
+                        </button>
+                        <button class="btn btn-secondary" id="clearFiltersBtn">
+                            <i class="bi bi-x-circle"></i> Clear Filters
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search Results Message (will appear here) -->
+                <div id="searchResultsMsg" style="margin-top: 15px;"></div>
+
+                <!-- Quick Filter Buttons -->
+                <div class="filter-buttons" style="margin-top: 20px;">
+                    <button class="filter-btn active" data-filter="all">
+                        <i class="bi bi-list"></i> All Items
+                    </button>
+                    <button class="filter-btn" data-filter="lost">
+                        <i class="bi bi-exclamation-circle"></i> Lost Items
+                    </button>
+                    <button class="filter-btn" data-filter="found">
+                        <i class="bi bi-check-circle"></i> Found Items
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="loadingSpinner" class="spinner" style="display: none;"></div>
+
+            <!-- Items Grid -->
+            <div id="itemsContainer" class="items-grid"></div>
+        </section>
+    </main>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h3><i class="bi bi-exclamation-triangle"></i> Confirm Delete</h3>
+            <p>Are you sure you want to delete this item? This action cannot be undone.</p>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button class="btn btn-secondary" id="cancelDelete">Cancel</button>
+                <button class="btn btn-danger" id="confirmDelete">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-content">
+            <p>&copy; 2026 Quest International University - Campus Lost & Found System. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="/js/main.js"></script>
+    
+</body>
+</html>
