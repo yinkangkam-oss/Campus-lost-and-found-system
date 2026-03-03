@@ -10,22 +10,43 @@ const pool = mysql.createPool({
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'lost_found_db',
+    port: process.env.DB_PORT || 3306,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
     enableKeepAlive: true,
-    keepAliveInitialDelay: 0
+    keepAliveInitialDelay: 0,
+    // SSL configuration for TiDB Cloud
+    ssl: process.env.DB_HOST && process.env.DB_HOST.includes('tidbcloud.com') ? {
+        rejectUnauthorized: true
+    } : false
 });
 
 // Test connection and create table if not exists
 const initializeDatabase = async () => {
     try {
         const connection = await pool.getConnection();
+        console.log('✅ Database connected successfully');
         
-        // Create items table if it doesn't exist (with image_path column)
+        // First, check if we need to create users table
+        await connection.execute(`
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                email VARCHAR(100) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                full_name VARCHAR(100),
+                student_id VARCHAR(20),
+                role ENUM('student', 'staff', 'admin') DEFAULT 'student',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+        
+        // Create items table if it doesn't exist
         await connection.execute(`
             CREATE TABLE IF NOT EXISTS items (
                 id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NULL,
                 title VARCHAR(255) NOT NULL,
                 description TEXT NOT NULL,
                 category ENUM('lost', 'found') NOT NULL,
@@ -38,7 +59,8 @@ const initializeDatabase = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX idx_category (category),
                 INDEX idx_status (status),
-                INDEX idx_date (date)
+                INDEX idx_date (date),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
         
@@ -61,9 +83,11 @@ const initializeDatabase = async () => {
         }
         
         connection.release();
-        console.log('Database initialized successfully');
+        console.log('✅ Database initialized successfully');
     } catch (error) {
-        console.error('Database initialization error:', error);
+        console.error('❌ Database initialization error:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
         throw error;
     }
 };
