@@ -1003,3 +1003,9 @@ nav a .bi,
 #loginWarningModal .btn-primary:hover {
     background: #2980b9;
 }
+
+/* Footer styling improvement */
+footer {
+    margin-top: auto;
+    padding: 1.5rem 0;
+}
