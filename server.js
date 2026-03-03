@@ -21,7 +21,7 @@ dotenv.config();
 const db = require('./config/database');
 
 // Import models and routes
-const User = require('./models/user');
+const User = require('./models/User');
 const itemRoutes = require('./routes/items');
 const authRoutes = require('./routes/auth');
 
