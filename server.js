@@ -1,3 +1,6 @@
+// Campus Lost & Found System - Main Server File
+// Quest International University Project
+
 // server.js
 const express = require('express');
 const path = require('path');
