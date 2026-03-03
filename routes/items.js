@@ -2,7 +2,7 @@
 /* eslint-disable */
 const express = require('express');
 const router = express.Router();
-const Item = require('../models/item');
+const Item = require('../models/Item');
 const { validateItem, validateStatus } = require('../middleware/validation');
 const upload = require('../config/upload');
 const fs = require('fs');
