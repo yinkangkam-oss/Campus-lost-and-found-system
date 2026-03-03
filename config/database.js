@@ -34,16 +34,16 @@ let sslConfig = {
 
 // Create connection pool for better performance
 const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'lost_found_db',
-    port: process.env.DB_PORT || 3306,
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: parseInt(process.env.DB_PORT) || 4000, // Ensure port is a number
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
     enableKeepAlive: true,
-    keepAliveInitialDelay: 0,
+    keepAliveInitialDelay: 10000, // Increased for cloud connections
     // 🔐 SSL configuration for TiDB Cloud (required)
     ssl: sslConfig
 });

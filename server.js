@@ -86,7 +86,6 @@ testRawConnection();
 // ============================================
 // SESSION & PASSPORT CONFIGURATION
 // ============================================
-// Debug: Check environment variables
 console.log('========== SESSION STORE DEBUG ==========');
 console.log('DB_HOST:', process.env.DB_HOST || '❌ NOT SET');
 console.log('DB_PORT:', process.env.DB_PORT || '❌ NOT SET');
@@ -95,14 +94,28 @@ console.log('DB_NAME:', process.env.DB_NAME || '❌ NOT SET');
 console.log('DB_PASSWORD exists:', process.env.DB_PASSWORD ? '✅ YES' : '❌ NO');
 console.log('=========================================');
 
-// Create MySQL session store with explicit options (not URI)
-console.log('📦 Creating MySQL session store...');
-const sessionStore = new MySQLStore({
+// Create a connection pool specifically for sessions
+const sessionPool = mysql.createPool({
     host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
+    port: parseInt(process.env.DB_PORT) || 4000,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
+    waitForConnections: true,
+    connectionLimit: 5,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+    // TiDB Cloud requires TLS 1.2 or higher
+    ssl: {
+        rejectUnauthorized: true,
+        minVersion: 'TLSv1.2'
+    }
+});
+
+// Create session store using the pool
+const sessionStore = new MySQLStore({
+    connection: sessionPool,
     createDatabaseTable: true,
     schema: {
         tableName: 'sessions',
@@ -111,28 +124,29 @@ const sessionStore = new MySQLStore({
             expires: 'expires',
             data: 'data'
         }
-    },
-    // SSL configuration for TiDB Cloud
-    ssl: {
-        rejectUnauthorized: true,
-        minVersion: 'TLSv1.2'
-    },
-    // Connection pool settings
-    connectionLimit: 5,
-    connectTimeout: 30000,
-    acquireTimeout: 30000
+    }
 });
 
-// Session configuration - ONLY ONCE!
+// Test the session pool connection
+sessionPool.getConnection()
+    .then(conn => {
+        console.log('✅ Session pool connected successfully');
+        conn.release();
+    })
+    .catch(err => {
+        console.error('❌ Session pool connection failed:', err.message);
+    });
+
+// Session configuration
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+        secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24 // 24 hours
+        maxAge: 1000 * 60 * 60 * 24
     }
 }));
 
