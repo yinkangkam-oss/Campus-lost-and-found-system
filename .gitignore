@@ -18,5 +18,6 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Uploads (optional - you may want to keep this)
-# uploads/
+# IDE files
+.vscode/
+.idea/
