@@ -1,7 +1,6 @@
 // Campus Lost & Found System - Main Server File
 // Quest International University Project
 
-// server.js
 const express = require('express');
 const path = require('path');
 const dotenv = require('dotenv');
@@ -14,17 +13,13 @@ const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
 
-// Load environment variables
-dotenv.config();
-
 // Import database connection
 const db = require('./config/database');
 
 // Import models and routes
-const User = require('./models/User');
+const User = require('./models/User');  // ← capital 'U'
 const itemRoutes = require('./routes/items');
 const authRoutes = require('./routes/auth');
-
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
