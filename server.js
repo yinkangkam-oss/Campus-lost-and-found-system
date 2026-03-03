@@ -1,6 +1,4 @@
-// Campus Lost & Found System - Main Server File
-// Quest International University Project
-
+// server.js
 const express = require('express');
 const path = require('path');
 const dotenv = require('dotenv');
@@ -12,17 +10,25 @@ const session = require('express-session');
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
+const MySQLStore = require('express-mysql-session')(session);
+
+// Load environment variables
+dotenv.config();
 
 // Import database connection
 const db = require('./config/database');
 
 // Import models and routes
-const User = require('./models/User');  // ← capital 'U'
+const User = require('./models/User');
 const itemRoutes = require('./routes/items');
 const authRoutes = require('./routes/auth');
+
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// 🔧 FIX 1: Trust proxy for Render (fixes rate-limit warning)
+app.set('trust proxy', 1);
 
 // ============================================
 // SECURITY MIDDLEWARE
@@ -49,13 +55,32 @@ app.use(cors({
 // ============================================
 // SESSION & PASSPORT CONFIGURATION
 // ============================================
+// 🔧 FIX 2: MySQL session store for production
+const sessionStore = new MySQLStore({
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    createDatabaseTable: true, // Automatically creates session table
+    schema: {
+        tableName: 'sessions',
+        columnNames: {
+            session_id: 'session_id',
+            expires: 'expires',
+            data: 'data'
+        }
+    }
+});
+
 // Session configuration
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
+    store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24 // 24 hours
     }
@@ -109,7 +134,12 @@ passport.deserializeUser(async (id, done) => {
 // Rate limiting
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100 // limit each IP to 100 requests per windowMs
+    max: 100, // limit each IP to 100 requests per windowMs
+    validate: {
+        // 🔧 FIX 3: Disable specific validations if needed
+        trustProxy: false,
+        xForwardedForHeader: false
+    }
 });
 app.use('/api/', limiter);
 
@@ -134,11 +164,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // ============================================
 db.getConnection()
     .then(connection => {
-        console.log('Database connected successfully');
+        console.log('✅ Database connected successfully');
         connection.release();
     })
     .catch(err => {
-        console.error('Database connection failed:', err.message);
+        console.error('❌ Database connection failed:', err.message);
     });
 
 // ============================================
@@ -177,7 +207,7 @@ app.use((req, res, next) => {
 // ERROR HANDLING MIDDLEWARE
 // ============================================
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    console.error('❌ Server error:', err.stack);
     
     const error = process.env.NODE_ENV === 'production' 
         ? 'Internal Server Error' 
@@ -194,12 +224,8 @@ app.use((err, req, res, next) => {
 // START SERVER
 // ============================================
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔧 Trust proxy: enabled`);
+    console.log(`💾 Session store: MySQL`);
 });
-
-// Import backup routes
-const backupRoutes = require('./routes/backup');
-
-// Add with your other routes
-app.use('/api', backupRoutes);
