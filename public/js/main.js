@@ -1,3 +1,6 @@
+// Main JavaScript file for Campus Lost & Found System
+// Handles all frontend functionality
+
 // public/js/main.js - COMPLETE FINAL VERSION WITH LOGIN WARNING
 
 const API_BASE = '/api/items';
