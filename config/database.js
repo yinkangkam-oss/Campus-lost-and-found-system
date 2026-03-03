@@ -1,6 +1,8 @@
 // config/database.js
 const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
+const fs = require('fs');
+const path = require('path');
 
 dotenv.config();
 
@@ -12,6 +14,23 @@ console.log('DB_NAME:', process.env.DB_NAME || 'lost_found_db');
 console.log('DB_PORT:', process.env.DB_PORT || '3306');
 console.log('DB_PASSWORD exists:', process.env.DB_PASSWORD ? '✅ YES' : '❌ NO');
 console.log('=====================================');
+
+// SSL configuration for TiDB Cloud
+let sslConfig = {
+    rejectUnauthorized: true,
+    minVersion: 'TLSv1.2'
+};
+
+// Optional: Try to load CA certificate if needed (commented out by default)
+// try {
+//     const caPath = path.join(__dirname, '../certs/isrgrootx1.pem');
+//     if (fs.existsSync(caPath)) {
+//         sslConfig.ca = fs.readFileSync(caPath);
+//         console.log('✅ CA certificate loaded');
+//     }
+// } catch (err) {
+//     console.log('ℹ️ No CA certificate file found, using system defaults');
+// }
 
 // Create connection pool for better performance
 const pool = mysql.createPool({
@@ -26,9 +45,7 @@ const pool = mysql.createPool({
     enableKeepAlive: true,
     keepAliveInitialDelay: 0,
     // 🔐 SSL configuration for TiDB Cloud (required)
-    ssl: {
-        rejectUnauthorized: true
-    }
+    ssl: sslConfig
 });
 
 // Test connection and create tables
@@ -75,6 +92,24 @@ const initializeDatabase = async () => {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
         console.log('✅ Items table ready');
+        
+        // Check if image_path column exists (for existing databases)
+        const [columns] = await connection.execute(`
+            SELECT COLUMN_NAME 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_NAME = 'items' 
+            AND COLUMN_NAME = 'image_path'
+            AND TABLE_SCHEMA = ?
+        `, [process.env.DB_NAME || 'lost_found_db']);
+        
+        if (columns.length === 0) {
+            // Add image_path column if it doesn't exist
+            await connection.execute(`
+                ALTER TABLE items 
+                ADD COLUMN image_path VARCHAR(255) NULL AFTER contact_info
+            `);
+            console.log('✅ Added image_path column to items table');
+        }
         
         connection.release();
         console.log('✅ Database initialized successfully');
