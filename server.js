@@ -11,6 +11,7 @@ const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
 const MySQLStore = require('express-mysql-session')(session);
+const mysql = require('mysql2/promise'); // Added for raw connection test
 
 // Load environment variables
 dotenv.config();
@@ -53,16 +54,42 @@ app.use(cors({
 }));
 
 // ============================================
+// RAW CONNECTION TEST (Temporary - Remove after fixing)
+// ============================================
+const testRawConnection = async () => {
+    try {
+        console.log('🔍 Testing raw MySQL connection to TiDB Cloud...');
+        const connection = await mysql.createConnection({
+            host: process.env.DB_HOST,
+            port: process.env.DB_PORT,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME,
+            ssl: {
+                rejectUnauthorized: true,
+                minVersion: 'TLSv1.2'
+            }
+        });
+        console.log('✅ Raw MySQL connection successful!');
+        await connection.end();
+    } catch (error) {
+        console.error('❌ Raw MySQL connection failed:', error.message);
+        console.error('Error code:', error.code);
+    }
+};
+testRawConnection();
+
+// ============================================
 // SESSION & PASSPORT CONFIGURATION
 // ============================================
-// MySQL session store with SSL for TiDB Cloud
+// Enhanced MySQL session store with proper SSL for TiDB Cloud
 const sessionStore = new MySQLStore({
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    createDatabaseTable: true, // Automatically creates session table
+    createDatabaseTable: true,
     schema: {
         tableName: 'sessions',
         columnNames: {
@@ -71,10 +98,15 @@ const sessionStore = new MySQLStore({
             data: 'data'
         }
     },
-    // 🔐 SSL configuration for TiDB Cloud
+    // 🔐 CRITICAL: SSL configuration for TiDB Cloud
     ssl: {
-        rejectUnauthorized: true
-    }
+        rejectUnauthorized: true,
+        minVersion: 'TLSv1.2'
+    },
+    // Additional connection options
+    connectionLimit: 5,
+    connectTimeout: 20000,
+    acquireTimeout: 20000
 });
 
 // Session configuration
@@ -167,11 +199,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // ============================================
 db.getConnection()
     .then(connection => {
-        console.log('✅ Database connected successfully');
+        console.log('✅ Main database pool connected successfully');
         connection.release();
     })
     .catch(err => {
-        console.error('❌ Database connection failed:', err.message);
+        console.error('❌ Main database pool connection failed:', err.message);
     });
 
 // ============================================
@@ -230,5 +262,5 @@ app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🔧 Trust proxy: enabled`);
-    console.log(`💾 Session store: MySQL with SSL`);
+    console.log(`💾 Session store: MySQL with enhanced SSL`);
 });
