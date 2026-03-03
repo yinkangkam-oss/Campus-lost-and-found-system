@@ -4,14 +4,14 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-// 🔍 CRITICAL DEBUGGING - SHOWS WHAT ENV VARIABLES ARE RECEIVED
-console.log('========== DATABASE DEBUG ==========');
-console.log('DB_HOST:', process.env.DB_HOST || '❌ NOT SET');
-console.log('DB_USER:', process.env.DB_USER || '❌ NOT SET');
-console.log('DB_NAME:', process.env.DB_NAME || '❌ NOT SET');
-console.log('DB_PORT:', process.env.DB_PORT || '❌ NOT SET');
+// 🔍 Debug: Show what environment variables are being used
+console.log('========== DATABASE CONFIG ==========');
+console.log('DB_HOST:', process.env.DB_HOST || 'localhost');
+console.log('DB_USER:', process.env.DB_USER || 'root');
+console.log('DB_NAME:', process.env.DB_NAME || 'lost_found_db');
+console.log('DB_PORT:', process.env.DB_PORT || '3306');
 console.log('DB_PASSWORD exists:', process.env.DB_PASSWORD ? '✅ YES' : '❌ NO');
-console.log('====================================');
+console.log('=====================================');
 
 // Create connection pool for better performance
 const pool = mysql.createPool({
@@ -25,16 +25,16 @@ const pool = mysql.createPool({
     queueLimit: 0,
     enableKeepAlive: true,
     keepAliveInitialDelay: 0,
-    // SSL configuration for TiDB Cloud
-    ssl: process.env.DB_HOST && process.env.DB_HOST.includes('tidbcloud.com') ? {
+    // 🔐 SSL configuration for TiDB Cloud (required)
+    ssl: {
         rejectUnauthorized: true
-    } : false
+    }
 });
 
 // Test connection and create tables
 const initializeDatabase = async () => {
     try {
-        console.log('Attempting to connect to:', process.env.DB_HOST || 'localhost');
+        console.log('Attempting to connect to database...');
         const connection = await pool.getConnection();
         console.log('✅ Database connected successfully to:', process.env.DB_HOST);
         
@@ -76,24 +76,6 @@ const initializeDatabase = async () => {
         `);
         console.log('✅ Items table ready');
         
-        // Check if image_path column exists (for existing databases)
-        const [columns] = await connection.execute(`
-            SELECT COLUMN_NAME 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_NAME = 'items' 
-            AND COLUMN_NAME = 'image_path'
-            AND TABLE_SCHEMA = ?
-        `, [process.env.DB_NAME || 'lost_found_db']);
-        
-        if (columns.length === 0) {
-            // Add image_path column if it doesn't exist
-            await connection.execute(`
-                ALTER TABLE items 
-                ADD COLUMN image_path VARCHAR(255) NULL AFTER contact_info
-            `);
-            console.log('✅ Added image_path column to items table');
-        }
-        
         connection.release();
         console.log('✅ Database initialized successfully');
     } catch (error) {
@@ -108,12 +90,3 @@ const initializeDatabase = async () => {
 initializeDatabase().catch(console.error);
 
 module.exports = pool;
-
-// config/database.js - Add this after dotenv.config()
-console.log('========== RUNTIME ENV CHECK ==========');
-console.log('DB_HOST:', process.env.DB_HOST);
-console.log('DB_USER:', process.env.DB_USER);
-console.log('DB_PASSWORD exists?', process.env.DB_PASSWORD ? 'YES' : 'NO');
-console.log('DB_NAME:', process.env.DB_NAME);
-console.log('DB_PORT:', process.env.DB_PORT);
-console.log('=======================================');

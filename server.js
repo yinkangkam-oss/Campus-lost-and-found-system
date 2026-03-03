@@ -27,7 +27,7 @@ const authRoutes = require('./routes/auth');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 🔧 FIX 1: Trust proxy for Render (fixes rate-limit warning)
+// Trust proxy for Render (fixes rate-limit warning)
 app.set('trust proxy', 1);
 
 // ============================================
@@ -55,7 +55,7 @@ app.use(cors({
 // ============================================
 // SESSION & PASSPORT CONFIGURATION
 // ============================================
-// 🔧 FIX 2: MySQL session store for production
+// MySQL session store with SSL for TiDB Cloud
 const sessionStore = new MySQLStore({
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
@@ -70,6 +70,10 @@ const sessionStore = new MySQLStore({
             expires: 'expires',
             data: 'data'
         }
+    },
+    // 🔐 SSL configuration for TiDB Cloud
+    ssl: {
+        rejectUnauthorized: true
     }
 });
 
@@ -136,7 +140,6 @@ const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // limit each IP to 100 requests per windowMs
     validate: {
-        // 🔧 FIX 3: Disable specific validations if needed
         trustProxy: false,
         xForwardedForHeader: false
     }
@@ -227,5 +230,5 @@ app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🔧 Trust proxy: enabled`);
-    console.log(`💾 Session store: MySQL`);
+    console.log(`💾 Session store: MySQL with SSL`);
 });
