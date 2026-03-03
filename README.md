@@ -1,31 +1,28 @@
-# Campus Lost & Found Management System
+# Campus Lost & Found System
 
-A full-stack web application for digitizing the campus lost and found process, replacing manual methods with a centralized, secure, and efficient system.
+A full-stack web application for managing lost and found items at Quest International University.
 
 ## Features
+- User authentication (login/register)
+- Report lost items
+- Report found items
+- View all items with filters
+- Search functionality
+- Image upload
+- Update item status
+- Delete items
+- Responsive design
 
-- ✅ Report lost items
-- ✅ Report found items
-- ✅ View all lost items
-- ✅ View all found items
-- ✅ Detailed item information
-- ✅ Update item status (Active → Claimed/Resolved)
-- ✅ Delete reports
-- ✅ Responsive design
-- ✅ Server-side validation
-- ✅ Security measures (XSS prevention, SQL injection protection)
-
-## Technology Stack
-
-- **Frontend**: HTML5, CSS3, JavaScript (Vanilla)
-- **Backend**: Node.js, Express.js
-- **Database**: MySQL
-- **Security**: Helmet, CORS, Rate Limiting, Input Sanitization
-- **Performance**: Compression, Lazy Loading, Minified Assets
+## Technologies Used
+- Frontend: HTML5, CSS3, JavaScript, Bootstrap Icons
+- Backend: Node.js, Express.js
+- Database: MySQL
+- Security: bcrypt, express-validator, helmet
+- File Upload: Multer
 
 ## Installation
-
 1. Clone the repository
-```bash
-git clone https://github.com/yourusername/campus-lost-found-system.git
-cd campus-lost-found-system
+2. Install dependencies: `npm install`
+3. Create MySQL database: `lost_found_db`
+4. Configure `.env` file
+5. Run: `npm start`
