@@ -33,10 +33,10 @@ async function checkAuthStatus() {
 // ============================================
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('DOM loaded');
-    
+
     // Check authentication status first
     await checkAuthStatus();
-    
+
     // Load items if on main page
     if (document.getElementById('itemsContainer')) {
         loadItems();
@@ -44,24 +44,24 @@ document.addEventListener('DOMContentLoaded', async function() {
         setupSearch();
         setupAdvancedFilters();
     }
-    
+
     // Setup form if on add item page
     if (document.getElementById('itemForm')) {
         console.log('Form found, setting up...');
         setupForm();
         setupImagePreview();
     }
-    
+
     // Load item details if on detail page
     if (document.getElementById('itemDetail')) {
         loadItemDetail();
     }
-    
+
     // Setup auth page if on auth page
     if (document.getElementById('loginForm') || document.getElementById('registerForm')) {
         setupAuthPage();
     }
-    
+
     // Setup delete modal
     setupDeleteModal();
 });
@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 function updateNavigation() {
     const authLinks = document.getElementById('authLinks');
     if (!authLinks) return;
-    
+
     if (loggedInUser) {
         // User is logged in - show name and logout
         authLinks.innerHTML = `
@@ -86,8 +86,8 @@ function updateNavigation() {
             </div>
         `;
     } else {
-        // User is not logged in
-        authLinks.innerHTML = '<a href="/auth"><i class="bi bi-person"></i> Login</a>';
+        // User is not logged in (GitHub Pages-safe link)
+        authLinks.innerHTML = '<a href="./auth.html"><i class="bi bi-person"></i> Login</a>';
     }
 }
 
@@ -101,7 +101,8 @@ window.logout = async function() {
         if (data.success) {
             loggedInUser = null;
             updateNavigation();
-            window.location.href = '/';
+            // GitHub Pages-safe redirect
+            window.location.href = './index.html';
         }
     } catch (error) {
         console.error('Logout error:', error);
@@ -113,13 +114,13 @@ window.logout = async function() {
 // ============================================
 function setupAuthPage() {
     console.log('Setting up auth page');
-    
+
     // Setup toggle between login and register
     setupAuthToggles();
-    
+
     // Setup login form
     setupLoginForm();
-    
+
     // Setup register form
     setupRegisterForm();
 }
@@ -129,9 +130,9 @@ function setupAuthToggles() {
     const showRegisterBtn = document.getElementById('showRegisterBtn');
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
-    
+
     if (!showLoginBtn || !showRegisterBtn || !loginForm || !registerForm) return;
-    
+
     showLoginBtn.addEventListener('click', function() {
         loginForm.style.display = 'block';
         registerForm.style.display = 'none';
@@ -159,32 +160,33 @@ function setupAuthToggles() {
 function setupLoginForm() {
     const loginForm = document.getElementById('loginForm');
     if (!loginForm) return;
-    
+
     loginForm.addEventListener('submit', async function(e) {
         e.preventDefault();
-        
+
         const username = document.getElementById('loginUsername')?.value;
         const password = document.getElementById('loginPassword')?.value;
-        
+
         if (!username || !password) {
             showAuthMessage('Please fill in all fields', 'error');
             return;
         }
-        
+
         try {
             const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
                 loggedInUser = data.user;
                 showAuthMessage('Login successful! Redirecting...', 'success');
                 setTimeout(() => {
-                    window.location.href = '/';
+                    // GitHub Pages-safe redirect
+                    window.location.href = './index.html';
                 }, 1500);
             } else {
                 // Show error message from server
@@ -200,7 +202,7 @@ function setupLoginForm() {
 function setupRegisterForm() {
     const registerForm = document.getElementById('registerForm');
     if (!registerForm) return;
-    
+
     registerForm.addEventListener('submit', async function(e) {
         e.preventDefault();
 
@@ -216,12 +218,12 @@ function setupRegisterForm() {
         const username = document.getElementById('regUsername')?.value;
         const email = document.getElementById('regEmail')?.value;
         const studentId = document.getElementById('regStudentId')?.value;
-        
+
         if (!fullName || !username || !email || !password) {
             showAuthMessage('Please fill in all required fields', 'error');
             return;
         }
-        
+
         try {
             const response = await fetch('/api/auth/register', {
                 method: 'POST',
@@ -234,9 +236,9 @@ function setupRegisterForm() {
                     student_id: studentId
                 })
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
                 showAuthMessage('Registration successful! Please login.', 'success');
                 // Switch to login form after 2 seconds
@@ -258,7 +260,7 @@ function setupRegisterForm() {
 function showAuthMessage(message, type) {
     const messageDiv = document.getElementById('message');
     if (!messageDiv) return;
-    
+
     const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
     const icon = type === 'success' ? 'bi-check-circle' : 'bi-exclamation-circle';
     messageDiv.innerHTML = `<div class="alert ${alertClass}"><i class="bi ${icon}"></i> ${message}</div>`;
@@ -277,7 +279,7 @@ function clearAuthMessage() {
 function showLoginWarning() {
     // Check if modal already exists
     let warningModal = document.getElementById('loginWarningModal');
-    
+
     if (!warningModal) {
         // Create modal HTML
         const modalHTML = `
@@ -290,7 +292,7 @@ function showLoginWarning() {
                         You must be logged in to report a lost or found item.
                     </p>
                     <div style="display: flex; gap: 10px; justify-content: center;">
-                        <a href="/auth" class="btn btn-primary">
+                        <a href="./auth.html" class="btn btn-primary">
                             <i class="bi bi-box-arrow-in-right"></i> Go to Login
                         </a>
                         <button class="btn btn-secondary" onclick="closeLoginWarning()">
@@ -300,7 +302,7 @@ function showLoginWarning() {
                 </div>
             </div>
         `;
-        
+
         // Add to page
         document.body.insertAdjacentHTML('beforeend', modalHTML);
     } else {
@@ -330,14 +332,14 @@ window.checkLoginBeforeReport = function(event) {
 function setupImagePreview() {
     const imageInput = document.getElementById('image');
     if (!imageInput) return;
-    
+
     imageInput.addEventListener('change', function(e) {
         const preview = document.getElementById('imagePreview');
         if (!preview) return;
-        
+
         const previewImg = preview.querySelector('img');
         const file = e.target.files[0];
-        
+
         if (file) {
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -413,9 +415,9 @@ function setupAdvancedFilters() {
             if (document.getElementById('filterStatus')) document.getElementById('filterStatus').value = '';
             if (document.getElementById('filterFromDate')) document.getElementById('filterFromDate').value = '';
             if (document.getElementById('filterToDate')) document.getElementById('filterToDate').value = '';
-            
+
             currentFilters = {};
-            
+
             if (currentSearchTerm) {
                 performSearch();
             } else {
@@ -436,7 +438,7 @@ async function performSearch() {
 
     // Build query string
     let queryString = `?q=${encodeURIComponent(searchTerm)}`;
-    
+
     if (currentFilters.category) {
         queryString += `&category=${currentFilters.category}`;
     }
@@ -453,14 +455,14 @@ async function performSearch() {
     try {
         const response = await fetch(`${API_BASE}/search/advanced${queryString}`);
         const data = await response.json();
-        
+
         // Hide spinner
         if (spinner) spinner.style.display = 'none';
-        
+
         if (data.success) {
             currentItems = data.data;
             filterAndDisplayItems();
-            
+
             // Show results message
             const resultsMsg = document.getElementById('searchResultsMsg');
             if (resultsMsg) {
@@ -482,19 +484,19 @@ async function performSearch() {
 window.clearSearch = function() {
     const searchInput = document.getElementById('searchInput');
     const resultsMsg = document.getElementById('searchResultsMsg');
-    
+
     if (searchInput) searchInput.value = '';
     currentSearchTerm = '';
     currentFilters = {};
-    
+
     // Clear filter inputs
     if (document.getElementById('filterCategory')) document.getElementById('filterCategory').value = '';
     if (document.getElementById('filterStatus')) document.getElementById('filterStatus').value = '';
     if (document.getElementById('filterFromDate')) document.getElementById('filterFromDate').value = '';
     if (document.getElementById('filterToDate')) document.getElementById('filterToDate').value = '';
-    
+
     if (resultsMsg) resultsMsg.innerHTML = '';
-    
+
     loadItems();
 };
 
@@ -504,12 +506,12 @@ window.clearSearch = function() {
 function loadItems() {
     const spinner = document.getElementById('loadingSpinner');
     if (spinner) spinner.style.display = 'block';
-    
+
     fetch(API_BASE)
         .then(response => response.json())
         .then(data => {
             if (spinner) spinner.style.display = 'none';
-            
+
             if (data.success) {
                 currentItems = data.data;
                 filterAndDisplayItems();
@@ -527,16 +529,16 @@ function loadItems() {
 function filterAndDisplayItems() {
     const container = document.getElementById('itemsContainer');
     if (!container) return;
-    
-    let filteredItems = currentFilter === 'all' 
-        ? currentItems 
+
+    let filteredItems = currentFilter === 'all'
+        ? currentItems
         : currentItems.filter(item => item.category === currentFilter);
-    
+
     if (filteredItems.length === 0) {
         container.innerHTML = `<div class="alert alert-info">No ${currentFilter === 'all' ? '' : currentFilter} items found.</div>`;
         return;
     }
-    
+
     container.innerHTML = filteredItems.map(item => createItemCard(item)).join('');
     attachEventListeners();
 }
@@ -544,16 +546,16 @@ function filterAndDisplayItems() {
 function createItemCard(item) {
     const description = item.description?.substring(0, 150) + (item.description?.length > 150 ? '...' : '') || '';
     const dateStr = formatDate(item.date);
-    
+
     // Show poster name if available
-    const postedBy = item.full_name ? 
-        `<small class="posted-by"><i class="bi bi-person-circle"></i> ${escapeHtml(item.full_name)}</small>` : 
+    const postedBy = item.full_name ?
+        `<small class="posted-by"><i class="bi bi-person-circle"></i> ${escapeHtml(item.full_name)}</small>` :
         '<small class="posted-by"><i class="bi bi-person-circle"></i> Anonymous</small>';
-    
-    const imageHtml = item.image_path 
+
+    const imageHtml = item.image_path
         ? `<div class="item-image-container"><img src="${item.image_path}" alt="${escapeHtml(item.title)}" class="item-thumbnail" loading="lazy"></div>`
         : `<div class="item-image-container no-image"><i class="bi bi-image" style="font-size: 40px; color: #ccc;"></i></div>`;
-    
+
     // Only show edit/delete buttons if user owns this item
     const actionButtons = (loggedInUser && loggedInUser.id === item.user_id) ? `
         <select class="status-select" data-id="${item.id}">
@@ -563,7 +565,7 @@ function createItemCard(item) {
         </select>
         <button class="btn btn-danger delete-btn" data-id="${item.id}"><i class="bi bi-trash"></i></button>
     ` : '';
-    
+
     return `
         <div class="item-card ${item.category}">
             <span class="item-category ${item.category}">
@@ -593,17 +595,18 @@ function attachEventListeners() {
     document.querySelectorAll('.view-btn').forEach(btn => {
         btn.addEventListener('click', e => {
             e.preventDefault();
-            window.location.href = `/item/${btn.dataset.id}`;
+            // GitHub Pages-friendly: use query string instead of Express route
+            window.location.href = `./item-detail.html?id=${encodeURIComponent(btn.dataset.id)}`;
         });
     });
-    
+
     document.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', e => {
             e.preventDefault();
             showDeleteModal(btn.dataset.id);
         });
     });
-    
+
     document.querySelectorAll('.status-select').forEach(select => {
         select.addEventListener('change', e => {
             updateItemStatus(select.dataset.id, select.value);
@@ -631,50 +634,51 @@ function setupFilterButtons() {
 function setupForm() {
     const form = document.getElementById('itemForm');
     if (!form) return;
-    
+
     console.log('Form found, adding submit handler');
-    
+
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
         console.log('Form submitted');
-        
+
         // Check if user is logged in
         if (!loggedInUser) {
             showLoginWarning();
             return;
         }
-        
+
         const formData = new FormData(form);
-        
+
         const title = document.getElementById('title')?.value.trim();
         const description = document.getElementById('description')?.value.trim();
         const category = document.getElementById('category')?.value;
         const location = document.getElementById('location')?.value.trim();
         const date = document.getElementById('date')?.value;
         const contact = document.getElementById('contact_info')?.value.trim();
-        
+
         if (!title || !description || !category || !location || !date || !contact) {
             alert('Please fill in all required fields');
             return;
         }
-        
+
         const submitBtn = document.getElementById('submitBtn');
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerHTML = 'Submitting...';
         }
-        
+
         try {
             const response = await fetch(API_BASE, {
                 method: 'POST',
                 body: formData
             });
-            
+
             const result = await response.json();
-            
+
             if (result.success) {
                 alert('Item submitted successfully!');
-                window.location.href = '/';
+                // GitHub Pages-safe redirect
+                window.location.href = './index.html';
             } else {
                 alert('Error: ' + (result.message || 'Unknown error'));
                 if (submitBtn) {
@@ -688,7 +692,7 @@ function setupForm() {
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Submit Report';
-            }
+                }
         }
     });
 }
@@ -697,9 +701,15 @@ function setupForm() {
 // ITEM DETAIL PAGE
 // ============================================
 function loadItemDetail() {
-    const id = window.location.pathname.split('/').pop();
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
     const container = document.getElementById('itemDetail');
-    
+
+    if (!id) {
+        if (container) container.innerHTML = '<div class="alert alert-error">Item not found</div>';
+        return;
+    }
+
     fetch(`${API_BASE}/${id}`)
         .then(res => res.json())
         .then(data => {
@@ -717,14 +727,14 @@ function loadItemDetail() {
 
 function displayItemDetail(item) {
     const container = document.getElementById('itemDetail');
-    
-    const imageHtml = item.image_path 
+
+    const imageHtml = item.image_path
         ? `<div class="detail-image-container"><img src="${item.image_path}" alt="${escapeHtml(item.title)}" class="detail-image"></div>`
         : '';
-    
+
     // Check if current user owns this item
     const isOwner = loggedInUser && loggedInUser.id === item.user_id;
-    
+
     // Show edit/delete buttons only for owner
     const actionButtons = isOwner ? `
         <select class="status-select" onchange="updateItemStatus(${item.id}, this.value)">
@@ -734,12 +744,12 @@ function displayItemDetail(item) {
         </select>
         <button class="btn btn-danger" onclick="showDeleteModal(${item.id})"><i class="bi bi-trash"></i> Delete</button>
     ` : '';
-    
+
     // Show posted by info
-    const postedBy = item.full_name ? 
-        `<small><i class="bi bi-person-circle"></i> Posted by: ${escapeHtml(item.full_name)}</small>` : 
+    const postedBy = item.full_name ?
+        `<small><i class="bi bi-person-circle"></i> Posted by: ${escapeHtml(item.full_name)}</small>` :
         '<small><i class="bi bi-person-circle"></i> Posted by: Anonymous</small>';
-    
+
     container.innerHTML = `
         <div class="item-detail-card">
             <div class="item-header">
@@ -780,7 +790,7 @@ function displayItemDetail(item) {
                 </div>
             </div>
             <div class="item-actions">
-                <button class="btn btn-primary" onclick="window.location.href='/'"><i class="bi bi-arrow-left"></i> Back</button>
+                <button class="btn btn-primary" onclick="window.location.href='./index.html'"><i class="bi bi-arrow-left"></i> Back</button>
                 ${actionButtons}
             </div>
         </div>
@@ -820,25 +830,25 @@ function setupDeleteModal() {
         console.log('Delete modal not found - this is normal on non-detail pages');
         return;
     }
-    
+
     console.log('Setting up delete modal');
-    
+
     const closeBtn = document.querySelector('.close-modal');
     const cancelBtn = document.getElementById('cancelDelete');
     const confirmBtn = document.getElementById('confirmDelete');
-    
+
     if (closeBtn) {
         closeBtn.addEventListener('click', function() {
             modal.style.display = 'none';
         });
     }
-    
+
     if (cancelBtn) {
         cancelBtn.addEventListener('click', function() {
             modal.style.display = 'none';
         });
     }
-    
+
     if (confirmBtn) {
         confirmBtn.addEventListener('click', function() {
             const id = this.getAttribute('data-id');
@@ -848,7 +858,7 @@ function setupDeleteModal() {
             }
         });
     }
-    
+
     window.addEventListener('click', function(e) {
         if (e.target === modal) {
             modal.style.display = 'none';
@@ -861,7 +871,7 @@ function showDeleteModal(id) {
     console.log('showDeleteModal called with ID:', id);
     const modal = document.getElementById('deleteModal');
     const confirmBtn = document.getElementById('confirmDelete');
-    
+
     if (modal && confirmBtn) {
         confirmBtn.setAttribute('data-id', id);
         modal.style.display = 'block';
@@ -874,7 +884,7 @@ function showDeleteModal(id) {
 
 function deleteItem(id) {
     console.log('deleteItem called with ID:', id);
-    
+
     fetch(`${API_BASE}/${id}`, {
         method: 'DELETE'
     })
@@ -888,7 +898,8 @@ function deleteItem(id) {
             alert('Item deleted successfully!');
             const modal = document.getElementById('deleteModal');
             if (modal) modal.style.display = 'none';
-            window.location.href = '/';
+            // GitHub Pages-safe redirect
+            window.location.href = './index.html';
         } else {
             alert('Error deleting item: ' + (data.message || 'You may not own this item'));
             const modal = document.getElementById('deleteModal');
