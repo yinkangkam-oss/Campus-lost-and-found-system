@@ -10,8 +10,6 @@ const session = require('express-session');
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
-const MySQLStore = require('express-mysql-session')(session);
-const mysql = require('mysql2/promise');
 
 // Load environment variables
 dotenv.config();
@@ -28,7 +26,7 @@ const authRoutes = require('./routes/auth');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Trust proxy for Render (fixes rate-limit warning)
+// Trust proxy for Render (if deployed)
 app.set('trust proxy', 1);
 
 // ============================================
@@ -54,103 +52,19 @@ app.use(cors({
 }));
 
 // ============================================
-// RAW CONNECTION TEST (Temporary - Remove after fixing)
-// ============================================
-const testRawConnection = async () => {
-    try {
-        console.log('🔍 Testing raw MySQL connection to TiDB Cloud...');
-        const connection = await mysql.createConnection({
-            host: process.env.DB_HOST,
-            port: process.env.DB_PORT,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME,
-            ssl: {
-                rejectUnauthorized: true,
-                minVersion: 'TLSv1.2'
-            }
-        });
-        console.log('✅ Raw MySQL connection successful!');
-        await connection.end();
-        return true;
-    } catch (error) {
-        console.error('❌ Raw MySQL connection failed:', error.message);
-        console.error('Error code:', error.code);
-        return false;
-    }
-};
-
-// Run raw connection test
-testRawConnection();
-
-// ============================================
 // SESSION & PASSPORT CONFIGURATION
 // ============================================
-console.log('========== SESSION STORE DEBUG ==========');
-console.log('DB_HOST:', process.env.DB_HOST || '❌ NOT SET');
-console.log('DB_PORT:', process.env.DB_PORT || '❌ NOT SET');
-console.log('DB_USER:', process.env.DB_USER || '❌ NOT SET');
-console.log('DB_NAME:', process.env.DB_NAME || '❌ NOT SET');
-console.log('DB_PASSWORD exists:', process.env.DB_PASSWORD ? '✅ YES' : '❌ NO');
-console.log('=========================================');
-
-// Create a connection pool specifically for sessions
-const sessionPool = mysql.createPool({
-    host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT) || 4000,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 5,
-    queueLimit: 0,
-    enableKeepAlive: true,
-    keepAliveInitialDelay: 10000,
-    // TiDB Cloud requires TLS 1.2 or higher
-    ssl: {
-        rejectUnauthorized: true,
-        minVersion: 'TLSv1.2'
-    }
-});
-
-// Create session store using the pool
-const sessionStore = new MySQLStore({
-    connection: sessionPool,
-    createDatabaseTable: true,
-    schema: {
-        tableName: 'sessions',
-        columnNames: {
-            session_id: 'session_id',
-            expires: 'expires',
-            data: 'data'
-        }
-    }
-});
-
-// Test the session pool connection
-sessionPool.getConnection()
-    .then(conn => {
-        console.log('✅ Session pool connected successfully');
-        conn.release();
-    })
-    .catch(err => {
-        console.error('❌ Session pool connection failed:', err.message);
-    });
-
 // Session configuration
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
-    store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24
+        maxAge: 1000 * 60 * 60 * 24 // 24 hours
     }
 }));
-
-console.log('✅ Session store configured');
 
 // Passport initialization
 app.use(passport.initialize());
@@ -160,7 +74,7 @@ app.use(passport.session());
 passport.use(new LocalStrategy(
     async (username, password, done) => {
         try {
-            // Try to find user by email or username
+            // Find user by email or username
             const user = await User.findByEmail(username) || await User.findByUsername(username);
             
             if (!user) {
@@ -179,12 +93,12 @@ passport.use(new LocalStrategy(
     }
 ));
 
-// Serialize user for session
+// Serialize user
 passport.serializeUser((user, done) => {
     done(null, user.id);
 });
 
-// Deserialize user from session
+// Deserialize user
 passport.deserializeUser(async (id, done) => {
     try {
         const user = await User.findById(id);
@@ -199,29 +113,25 @@ passport.deserializeUser(async (id, done) => {
 // ============================================
 // Rate limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
-    validate: {
-        trustProxy: false,
-        xForwardedForHeader: false
-    }
+    windowMs: 15 * 60 * 1000,
+    max: 100
 });
 app.use('/api/', limiter);
 
-// Compression middleware for performance
+// Compression middleware
 app.use(compression());
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static file serving with cache control for performance
+// Static file serving
 app.use(express.static(path.join(__dirname, 'public'), {
     maxAge: '1d',
     etag: true
 }));
 
-// Serve uploads folder (for images)
+// Serve uploads folder
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ============================================
@@ -229,11 +139,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // ============================================
 db.getConnection()
     .then(connection => {
-        console.log('✅ Main database pool connected successfully');
+        console.log('✅ Database connected successfully');
         connection.release();
     })
     .catch(err => {
-        console.error('❌ Main database pool connection failed:', err.message);
+        console.error('❌ Database connection failed:', err.message);
     });
 
 // ============================================
@@ -264,7 +174,7 @@ app.get('/auth', (req, res) => {
 // ============================================
 // 404 HANDLER
 // ============================================
-app.use((req, res, next) => {
+app.use((req, res) => {
     res.status(404).sendFile(path.join(__dirname, 'views', '404.html'));
 });
 
@@ -291,6 +201,4 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔧 Trust proxy: enabled`);
-    console.log(`💾 Session store: MySQL with SSL`);
 });

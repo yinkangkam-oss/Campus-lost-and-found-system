@@ -14,15 +14,14 @@ A full-stack web application for managing lost and found items at Quest Internat
 - Responsive design
 
 ## Technologies Used
-- Frontend: HTML5, CSS3, JavaScript, Bootstrap Icons
-- Backend: Node.js, Express.js
-- Database: MySQL
-- Security: bcrypt, express-validator, helmet
-- File Upload: Multer
+- **Frontend**: HTML5, CSS3, JavaScript, Bootstrap Icons
+- **Backend**: Node.js, Express.js
+- **Database**: MySQL
+- **Security**: bcrypt, express-validator, helmet
+- **File Upload**: Multer
 
 ## Installation
+
 1. Clone the repository
-2. Install dependencies: `npm install`
-3. Create MySQL database: `lost_found_db`
-4. Configure `.env` file
-5. Run: `npm start`
+```bash
+git clone https://github.com/yinkangkam-oss/Campus-lost-and-found-system.git

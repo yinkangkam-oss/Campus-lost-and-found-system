@@ -1,7 +1,7 @@
 // Main JavaScript file for Campus Lost & Found System
 // Handles all frontend functionality
 
-// public/js/main.js - COMPLETE FINAL VERSION WITH LOGIN WARNING
+// public/js/main.js - WITH DATABASE AUTHENTICATION
 
 const API_BASE = '/api/items';
 let currentItems = [];
@@ -9,14 +9,33 @@ let currentFilter = 'all';
 let currentSearchTerm = '';
 let currentFilters = {};
 
-// Store current user globally
-window.currentUser = null;
+// User authentication
+let loggedInUser = null;
+
+// Check for existing session on page load
+async function checkAuthStatus() {
+    try {
+        const response = await fetch('/api/auth/me');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+                loggedInUser = data.user;
+            }
+        }
+    } catch (error) {
+        console.log('Not authenticated');
+    }
+    updateNavigation();
+}
 
 // ============================================
 // INITIALIZATION
 // ============================================
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     console.log('DOM loaded');
+    
+    // Check authentication status first
+    await checkAuthStatus();
     
     // Load items if on main page
     if (document.getElementById('itemsContainer')) {
@@ -39,68 +58,218 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Setup auth page if on auth page
-    if (document.getElementById('loginForm')) {
+    if (document.getElementById('loginForm') || document.getElementById('registerForm')) {
         setupAuthPage();
     }
     
     // Setup delete modal
     setupDeleteModal();
-    
-    // Check authentication status (for all pages)
-    checkAuth();
 });
 
 // ============================================
-// AUTHENTICATION FUNCTIONS (for all pages)
+// NAVIGATION (shows user status)
 // ============================================
-async function checkAuth() {
-    try {
-        const response = await fetch('/api/auth/me');
-        const data = await response.json();
-        const authLinks = document.getElementById('authLinks');
-        
-        if (!authLinks) return;
-        
-        if (data.success) {
-            // Store user globally
-            window.currentUser = data.user;
-            
-            // User is logged in - show user name and logout
-            authLinks.innerHTML = `
-                <div style="display: flex; gap: 15px; align-items: center;">
-                    <span style="color: white; display: flex; align-items: center; gap: 5px;">
-                        <i class="bi bi-person-circle"></i> ${data.user.full_name || data.user.username}
-                    </span>
-                    <a href="#" onclick="window.logout()" style="color: white;">
-                        <i class="bi bi-box-arrow-right"></i> Logout
-                    </a>
-                </div>
-            `;
-        } else {
-            window.currentUser = null;
-            authLinks.innerHTML = '<a href="/auth"><i class="bi bi-person"></i> Login</a>';
-        }
-    } catch (error) {
-        console.error('Auth check error:', error);
-        window.currentUser = null;
-        const authLinks = document.getElementById('authLinks');
-        if (authLinks) {
-            authLinks.innerHTML = '<a href="/auth"><i class="bi bi-person"></i> Login</a>';
-        }
+function updateNavigation() {
+    const authLinks = document.getElementById('authLinks');
+    if (!authLinks) return;
+    
+    if (loggedInUser) {
+        // User is logged in - show name and logout
+        authLinks.innerHTML = `
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <span style="color: white; display: flex; align-items: center; gap: 5px;">
+                    <i class="bi bi-person-circle"></i> ${loggedInUser.full_name || loggedInUser.username}
+                </span>
+                <a href="#" onclick="logout(); return false;" style="color: white;">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </a>
+            </div>
+        `;
+    } else {
+        // User is not logged in
+        authLinks.innerHTML = '<a href="/auth"><i class="bi bi-person"></i> Login</a>';
     }
 }
 
+// ============================================
+// LOGOUT FUNCTION
+// ============================================
 window.logout = async function() {
     try {
         const response = await fetch('/api/auth/logout');
         const data = await response.json();
         if (data.success) {
-            window.location.reload();
+            loggedInUser = null;
+            updateNavigation();
+            window.location.href = '/';
         }
     } catch (error) {
         console.error('Logout error:', error);
     }
 };
+
+// ============================================
+// AUTH PAGE FUNCTIONS
+// ============================================
+function setupAuthPage() {
+    console.log('Setting up auth page');
+    
+    // Setup toggle between login and register
+    setupAuthToggles();
+    
+    // Setup login form
+    setupLoginForm();
+    
+    // Setup register form
+    setupRegisterForm();
+}
+
+function setupAuthToggles() {
+    const showLoginBtn = document.getElementById('showLoginBtn');
+    const showRegisterBtn = document.getElementById('showRegisterBtn');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    
+    if (!showLoginBtn || !showRegisterBtn || !loginForm || !registerForm) return;
+    
+    showLoginBtn.addEventListener('click', function() {
+        loginForm.style.display = 'block';
+        registerForm.style.display = 'none';
+        this.classList.add('btn-primary');
+        this.classList.remove('btn-secondary');
+        showRegisterBtn.classList.add('btn-secondary');
+        showRegisterBtn.classList.remove('btn-primary');
+        clearAuthMessage();
+    });
+
+    showRegisterBtn.addEventListener('click', function() {
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+        this.classList.add('btn-primary');
+        this.classList.remove('btn-secondary');
+        showLoginBtn.classList.add('btn-secondary');
+        showLoginBtn.classList.remove('btn-primary');
+        clearAuthMessage();
+    });
+}
+
+// ============================================
+// FIXED LOGIN FORM - Now validates against database
+// ============================================
+function setupLoginForm() {
+    const loginForm = document.getElementById('loginForm');
+    if (!loginForm) return;
+    
+    loginForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const username = document.getElementById('loginUsername')?.value;
+        const password = document.getElementById('loginPassword')?.value;
+        
+        if (!username || !password) {
+            showAuthMessage('Please fill in all fields', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                loggedInUser = data.user;
+                showAuthMessage('Login successful! Redirecting...', 'success');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1500);
+            } else {
+                // Show error message from server
+                showAuthMessage(data.message || 'Invalid username or password', 'error');
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            showAuthMessage('Network error. Please try again.', 'error');
+        }
+    });
+}
+
+function setupRegisterForm() {
+    const registerForm = document.getElementById('registerForm');
+    if (!registerForm) return;
+    
+    registerForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const password = document.getElementById('regPassword')?.value;
+        const confirm = document.getElementById('regConfirmPassword')?.value;
+
+        if (password !== confirm) {
+            showAuthMessage('Passwords do not match!', 'error');
+            return;
+        }
+
+        const fullName = document.getElementById('regFullName')?.value;
+        const username = document.getElementById('regUsername')?.value;
+        const email = document.getElementById('regEmail')?.value;
+        const studentId = document.getElementById('regStudentId')?.value;
+        
+        if (!fullName || !username || !email || !password) {
+            showAuthMessage('Please fill in all required fields', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username,
+                    email,
+                    password,
+                    full_name: fullName,
+                    student_id: studentId
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showAuthMessage('Registration successful! Please login.', 'success');
+                // Switch to login form after 2 seconds
+                setTimeout(() => {
+                    const showLoginBtn = document.getElementById('showLoginBtn');
+                    if (showLoginBtn) showLoginBtn.click();
+                    if (registerForm) registerForm.reset();
+                }, 2000);
+            } else {
+                showAuthMessage(data.message || 'Registration failed', 'error');
+            }
+        } catch (error) {
+            console.error('Registration error:', error);
+            showAuthMessage('Network error. Please try again.', 'error');
+        }
+    });
+}
+
+function showAuthMessage(message, type) {
+    const messageDiv = document.getElementById('message');
+    if (!messageDiv) return;
+    
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+    const icon = type === 'success' ? 'bi-check-circle' : 'bi-exclamation-circle';
+    messageDiv.innerHTML = `<div class="alert ${alertClass}"><i class="bi ${icon}"></i> ${message}</div>`;
+}
+
+function clearAuthMessage() {
+    const messageDiv = document.getElementById('message');
+    if (messageDiv) {
+        messageDiv.innerHTML = '';
+    }
+}
 
 // ============================================
 // LOGIN WARNING MODAL
@@ -147,148 +316,13 @@ window.closeLoginWarning = function() {
 
 // Check login before accessing report item page
 window.checkLoginBeforeReport = function(event) {
-    if (!window.currentUser) {
+    if (!loggedInUser) {
         event.preventDefault();
         showLoginWarning();
         return false;
     }
     return true;
 };
-
-// ============================================
-// AUTH PAGE FUNCTIONS (for /auth page only)
-// ============================================
-function setupAuthPage() {
-    // Only run on auth page
-    if (!document.getElementById('loginForm')) return;
-    
-    console.log('Setting up auth page');
-    
-    // Toggle between login and register forms
-    const showLoginBtn = document.getElementById('showLoginBtn');
-    const showRegisterBtn = document.getElementById('showRegisterBtn');
-    const loginForm = document.getElementById('loginForm');
-    const registerForm = document.getElementById('registerForm');
-    
-    if (showLoginBtn && showRegisterBtn) {
-        showLoginBtn.addEventListener('click', function() {
-            loginForm.style.display = 'block';
-            registerForm.style.display = 'none';
-            this.classList.add('btn-primary');
-            this.classList.remove('btn-secondary');
-            showRegisterBtn.classList.add('btn-secondary');
-            showRegisterBtn.classList.remove('btn-primary');
-            document.getElementById('message').innerHTML = '';
-        });
-
-        showRegisterBtn.addEventListener('click', function() {
-            loginForm.style.display = 'none';
-            registerForm.style.display = 'block';
-            this.classList.add('btn-primary');
-            this.classList.remove('btn-secondary');
-            showLoginBtn.classList.add('btn-secondary');
-            showLoginBtn.classList.remove('btn-primary');
-            document.getElementById('message').innerHTML = '';
-        });
-    }
-
-    // Handle login form submission
-    if (loginForm) {
-        loginForm.addEventListener('submit', handleLogin);
-    }
-
-    // Handle register form submission
-    if (registerForm) {
-        registerForm.addEventListener('submit', handleRegister);
-    }
-}
-
-async function handleLogin(e) {
-    e.preventDefault();
-    
-    const username = document.getElementById('loginUsername').value;
-    const password = document.getElementById('loginPassword').value;
-    
-    if (!username || !password) {
-        showAuthMessage('Please fill in all fields', 'error');
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        });
-
-        const data = await response.json();
-        
-        if (data.success) {
-            showAuthMessage('Login successful! Redirecting...', 'success');
-            setTimeout(() => {
-                window.location.href = '/';
-            }, 1500);
-        } else {
-            showAuthMessage(data.message || 'Login failed', 'error');
-        }
-    } catch (error) {
-        console.error('Login error:', error);
-        showAuthMessage('Network error. Please try again.', 'error');
-    }
-}
-
-async function handleRegister(e) {
-    e.preventDefault();
-
-    const password = document.getElementById('regPassword').value;
-    const confirm = document.getElementById('regConfirmPassword').value;
-
-    if (password !== confirm) {
-        showAuthMessage('Passwords do not match!', 'error');
-        return;
-    }
-
-    const userData = {
-        username: document.getElementById('regUsername').value,
-        email: document.getElementById('regEmail').value,
-        password: password,
-        full_name: document.getElementById('regFullName').value,
-        student_id: document.getElementById('regStudentId').value
-    };
-
-    try {
-        const response = await fetch('/api/auth/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(userData)
-        });
-
-        const data = await response.json();
-        
-        if (data.success) {
-            showAuthMessage('Registration successful! Please login.', 'success');
-            // Switch to login form
-            setTimeout(() => {
-                document.getElementById('showLoginBtn').click();
-                document.getElementById('registerForm').reset();
-            }, 2000);
-        } else {
-            showAuthMessage(data.message || 'Registration failed', 'error');
-        }
-    } catch (error) {
-        console.error('Registration error:', error);
-        showAuthMessage('Network error. Please try again.', 'error');
-    }
-}
-
-function showAuthMessage(message, type) {
-    const messageDiv = document.getElementById('message');
-    if (!messageDiv) return;
-    
-    const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
-    const icon = type === 'success' ? 'bi-check-circle' : 'bi-exclamation-circle';
-    messageDiv.innerHTML = `<div class="alert ${alertClass}"><i class="bi ${icon}"></i> ${message}</div>`;
-}
 
 // ============================================
 // IMAGE PREVIEW FUNCTIONALITY
@@ -521,7 +555,7 @@ function createItemCard(item) {
         : `<div class="item-image-container no-image"><i class="bi bi-image" style="font-size: 40px; color: #ccc;"></i></div>`;
     
     // Only show edit/delete buttons if user owns this item
-    const actionButtons = (window.currentUser && window.currentUser.id === item.user_id) ? `
+    const actionButtons = (loggedInUser && loggedInUser.id === item.user_id) ? `
         <select class="status-select" data-id="${item.id}">
             <option value="active" ${item.status === 'active' ? 'selected' : ''}>Active</option>
             <option value="claimed" ${item.status === 'claimed' ? 'selected' : ''}>Claimed</option>
@@ -592,7 +626,7 @@ function setupFilterButtons() {
 }
 
 // ============================================
-// FORM SUBMISSION - WITH LOGIN CHECK
+// FORM SUBMISSION
 // ============================================
 function setupForm() {
     const form = document.getElementById('itemForm');
@@ -604,8 +638,8 @@ function setupForm() {
         e.preventDefault();
         console.log('Form submitted');
         
-        // Check if user is logged in FIRST
-        if (!window.currentUser) {
+        // Check if user is logged in
+        if (!loggedInUser) {
             showLoginWarning();
             return;
         }
@@ -642,13 +676,7 @@ function setupForm() {
                 alert('Item submitted successfully!');
                 window.location.href = '/';
             } else {
-                // Check if error is due to authentication
-                if (response.status === 401) {
-                    showLoginWarning();
-                } else {
-                    alert('Error: ' + (result.message || 'Unknown error'));
-                }
-                
+                alert('Error: ' + (result.message || 'Unknown error'));
                 if (submitBtn) {
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Submit Report';
@@ -695,7 +723,7 @@ function displayItemDetail(item) {
         : '';
     
     // Check if current user owns this item
-    const isOwner = window.currentUser && window.currentUser.id === item.user_id;
+    const isOwner = loggedInUser && loggedInUser.id === item.user_id;
     
     // Show edit/delete buttons only for owner
     const actionButtons = isOwner ? `

@@ -18,6 +18,10 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Uploads (you may want to keep the folder but not the files)
+uploads/
+!uploads/.gitkeep
+
 # IDE files
 .vscode/
 .idea/
