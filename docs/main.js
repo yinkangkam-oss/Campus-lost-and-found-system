@@ -2,7 +2,10 @@
 // Handles all frontend functionality
 // GitHub Pages routing fixes + safer detail routing
 
-const API_BASE = '/api/items';
+// Backend server URL
+const API_ORIGIN = "http://localhost:3000"; // change later if deployed
+
+const API_BASE = `${API_ORIGIN}/api/items`;
 let currentItems = [];
 let currentFilter = 'all';
 let currentSearchTerm = '';
@@ -15,7 +18,6 @@ let loggedInUser = null;
 // Helpers for GitHub Pages
 // --------------------------------------------
 function goHome() {
-    // Works for Pages
     window.location.href = './index.html';
 }
 
@@ -32,15 +34,18 @@ function getQueryParam(name) {
     return params.get(name);
 }
 
-// If backend later returns image_path like "/uploads/xxx.jpg", this converts it.
-// On GitHub Pages without backend, it will still not load, but this avoids wrong paths.
+// If backend later returns image_path like "/uploads/xxx.jpg", convert it to absolute.
+// This makes images work when backend is running (localhost or deployed).
 function resolveImagePath(p) {
     if (!p) return '';
-    // If already absolute (http/https/data), keep it
+
+    // If already absolute (http/https or // or data:) keep it
     if (/^(https?:)?\/\//i.test(p) || /^data:/i.test(p)) return p;
 
     // If server-style absolute path e.g. "/uploads/a.jpg"
-    // Keep it as-is so it works when served from same domain as backend.
+    if (p.startsWith('/')) return `${API_ORIGIN}${p}`;
+
+    // Otherwise leave as is (relative paths)
     return p;
 }
 
@@ -49,7 +54,7 @@ function resolveImagePath(p) {
 // --------------------------------------------
 async function checkAuthStatus() {
     try {
-        const response = await fetch('/api/auth/me');
+        const response = await fetch(`${API_ORIGIN}/api/auth/me`);
         if (response.ok) {
             const data = await response.json();
             if (data.success) {
@@ -108,7 +113,6 @@ function updateNavigation() {
     if (!authLinks) return;
 
     if (loggedInUser) {
-        // User is logged in - show name and logout
         authLinks.innerHTML = `
             <div style="display: flex; gap: 15px; align-items: center;">
                 <span style="color: white; display: flex; align-items: center; gap: 5px;">
@@ -120,7 +124,6 @@ function updateNavigation() {
             </div>
         `;
     } else {
-        // GitHub Pages-safe link
         authLinks.innerHTML = '<a href="./auth.html"><i class="bi bi-person"></i> Login</a>';
     }
 }
@@ -130,7 +133,7 @@ function updateNavigation() {
 // ============================================
 window.logout = async function () {
     try {
-        const response = await fetch('/api/auth/logout');
+        const response = await fetch(`${API_ORIGIN}/api/auth/logout`);
         const data = await response.json();
         if (data.success) {
             loggedInUser = null;
@@ -200,7 +203,7 @@ function setupLoginForm() {
         }
 
         try {
-            const response = await fetch('/api/auth/login', {
+            const response = await fetch(`${API_ORIGIN}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
@@ -250,7 +253,7 @@ function setupRegisterForm() {
         }
 
         try {
-            const response = await fetch('/api/auth/register', {
+            const response = await fetch(`${API_ORIGIN}/api/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
