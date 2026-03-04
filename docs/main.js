@@ -1,7 +1,6 @@
 // Main JavaScript file for Campus Lost & Found System
 // Handles all frontend functionality
-
-// public/js/main.js - WITH DATABASE AUTHENTICATION
+// GitHub Pages routing fixes + safer detail routing
 
 const API_BASE = '/api/items';
 let currentItems = [];
@@ -12,7 +11,42 @@ let currentFilters = {};
 // User authentication
 let loggedInUser = null;
 
+// --------------------------------------------
+// Helpers for GitHub Pages
+// --------------------------------------------
+function goHome() {
+    // Works for Pages
+    window.location.href = './index.html';
+}
+
+function goAuth() {
+    window.location.href = './auth.html';
+}
+
+function goAddItem() {
+    window.location.href = './add-item.html';
+}
+
+function getQueryParam(name) {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(name);
+}
+
+// If backend later returns image_path like "/uploads/xxx.jpg", this converts it.
+// On GitHub Pages without backend, it will still not load, but this avoids wrong paths.
+function resolveImagePath(p) {
+    if (!p) return '';
+    // If already absolute (http/https/data), keep it
+    if (/^(https?:)?\/\//i.test(p) || /^data:/i.test(p)) return p;
+
+    // If server-style absolute path e.g. "/uploads/a.jpg"
+    // Keep it as-is so it works when served from same domain as backend.
+    return p;
+}
+
+// --------------------------------------------
 // Check for existing session on page load
+// --------------------------------------------
 async function checkAuthStatus() {
     try {
         const response = await fetch('/api/auth/me');
@@ -31,7 +65,7 @@ async function checkAuthStatus() {
 // ============================================
 // INITIALIZATION
 // ============================================
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async function () {
     console.log('DOM loaded');
 
     // Check authentication status first
@@ -86,7 +120,7 @@ function updateNavigation() {
             </div>
         `;
     } else {
-        // User is not logged in (GitHub Pages-safe link)
+        // GitHub Pages-safe link
         authLinks.innerHTML = '<a href="./auth.html"><i class="bi bi-person"></i> Login</a>';
     }
 }
@@ -94,15 +128,14 @@ function updateNavigation() {
 // ============================================
 // LOGOUT FUNCTION
 // ============================================
-window.logout = async function() {
+window.logout = async function () {
     try {
         const response = await fetch('/api/auth/logout');
         const data = await response.json();
         if (data.success) {
             loggedInUser = null;
             updateNavigation();
-            // GitHub Pages-safe redirect
-            window.location.href = './index.html';
+            goHome();
         }
     } catch (error) {
         console.error('Logout error:', error);
@@ -114,14 +147,8 @@ window.logout = async function() {
 // ============================================
 function setupAuthPage() {
     console.log('Setting up auth page');
-
-    // Setup toggle between login and register
     setupAuthToggles();
-
-    // Setup login form
     setupLoginForm();
-
-    // Setup register form
     setupRegisterForm();
 }
 
@@ -133,7 +160,7 @@ function setupAuthToggles() {
 
     if (!showLoginBtn || !showRegisterBtn || !loginForm || !registerForm) return;
 
-    showLoginBtn.addEventListener('click', function() {
+    showLoginBtn.addEventListener('click', function () {
         loginForm.style.display = 'block';
         registerForm.style.display = 'none';
         this.classList.add('btn-primary');
@@ -143,7 +170,7 @@ function setupAuthToggles() {
         clearAuthMessage();
     });
 
-    showRegisterBtn.addEventListener('click', function() {
+    showRegisterBtn.addEventListener('click', function () {
         loginForm.style.display = 'none';
         registerForm.style.display = 'block';
         this.classList.add('btn-primary');
@@ -155,13 +182,13 @@ function setupAuthToggles() {
 }
 
 // ============================================
-// FIXED LOGIN FORM - Now validates against database
+// LOGIN FORM
 // ============================================
 function setupLoginForm() {
     const loginForm = document.getElementById('loginForm');
     if (!loginForm) return;
 
-    loginForm.addEventListener('submit', async function(e) {
+    loginForm.addEventListener('submit', async function (e) {
         e.preventDefault();
 
         const username = document.getElementById('loginUsername')?.value;
@@ -185,11 +212,9 @@ function setupLoginForm() {
                 loggedInUser = data.user;
                 showAuthMessage('Login successful! Redirecting...', 'success');
                 setTimeout(() => {
-                    // GitHub Pages-safe redirect
-                    window.location.href = './index.html';
+                    goHome();
                 }, 1500);
             } else {
-                // Show error message from server
                 showAuthMessage(data.message || 'Invalid username or password', 'error');
             }
         } catch (error) {
@@ -203,7 +228,7 @@ function setupRegisterForm() {
     const registerForm = document.getElementById('registerForm');
     if (!registerForm) return;
 
-    registerForm.addEventListener('submit', async function(e) {
+    registerForm.addEventListener('submit', async function (e) {
         e.preventDefault();
 
         const password = document.getElementById('regPassword')?.value;
@@ -241,11 +266,10 @@ function setupRegisterForm() {
 
             if (data.success) {
                 showAuthMessage('Registration successful! Please login.', 'success');
-                // Switch to login form after 2 seconds
                 setTimeout(() => {
                     const showLoginBtn = document.getElementById('showLoginBtn');
                     if (showLoginBtn) showLoginBtn.click();
-                    if (registerForm) registerForm.reset();
+                    registerForm.reset();
                 }, 2000);
             } else {
                 showAuthMessage(data.message || 'Registration failed', 'error');
@@ -268,20 +292,16 @@ function showAuthMessage(message, type) {
 
 function clearAuthMessage() {
     const messageDiv = document.getElementById('message');
-    if (messageDiv) {
-        messageDiv.innerHTML = '';
-    }
+    if (messageDiv) messageDiv.innerHTML = '';
 }
 
 // ============================================
 // LOGIN WARNING MODAL
 // ============================================
 function showLoginWarning() {
-    // Check if modal already exists
     let warningModal = document.getElementById('loginWarningModal');
 
     if (!warningModal) {
-        // Create modal HTML
         const modalHTML = `
             <div id="loginWarningModal" class="modal" style="display: block; z-index: 9999;">
                 <div class="modal-content" style="max-width: 400px; text-align: center;">
@@ -302,22 +322,18 @@ function showLoginWarning() {
                 </div>
             </div>
         `;
-
-        // Add to page
         document.body.insertAdjacentHTML('beforeend', modalHTML);
     } else {
         warningModal.style.display = 'block';
     }
 }
 
-// Make close function global
-window.closeLoginWarning = function() {
+window.closeLoginWarning = function () {
     const modal = document.getElementById('loginWarningModal');
     if (modal) modal.style.display = 'none';
 };
 
-// Check login before accessing report item page
-window.checkLoginBeforeReport = function(event) {
+window.checkLoginBeforeReport = function (event) {
     if (!loggedInUser) {
         event.preventDefault();
         showLoginWarning();
@@ -333,7 +349,7 @@ function setupImagePreview() {
     const imageInput = document.getElementById('image');
     if (!imageInput) return;
 
-    imageInput.addEventListener('change', function(e) {
+    imageInput.addEventListener('change', function (e) {
         const preview = document.getElementById('imagePreview');
         if (!preview) return;
 
@@ -342,7 +358,7 @@ function setupImagePreview() {
 
         if (file) {
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 previewImg.src = e.target.result;
                 preview.style.display = 'block';
             };
@@ -361,21 +377,15 @@ function setupSearch() {
     const searchInput = document.getElementById('searchInput');
     const clearSearchBtn = document.getElementById('clearSearchBtn');
 
-    if (searchBtn) {
-        searchBtn.addEventListener('click', performSearch);
-    }
+    if (searchBtn) searchBtn.addEventListener('click', performSearch);
 
     if (searchInput) {
-        searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                performSearch();
-            }
+        searchInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') performSearch();
         });
     }
 
-    if (clearSearchBtn) {
-        clearSearchBtn.addEventListener('click', clearSearch);
-    }
+    if (clearSearchBtn) clearSearchBtn.addEventListener('click', clearSearch);
 }
 
 function setupAdvancedFilters() {
@@ -385,7 +395,7 @@ function setupAdvancedFilters() {
     const clearFiltersBtn = document.getElementById('clearFiltersBtn');
 
     if (toggleBtn && advancedFilters) {
-        toggleBtn.addEventListener('click', function() {
+        toggleBtn.addEventListener('click', function () {
             if (advancedFilters.style.display === 'none') {
                 advancedFilters.style.display = 'block';
                 toggleBtn.innerHTML = '<i class="bi bi-funnel"></i> Hide Filters';
@@ -397,7 +407,7 @@ function setupAdvancedFilters() {
     }
 
     if (applyFiltersBtn) {
-        applyFiltersBtn.addEventListener('click', function() {
+        applyFiltersBtn.addEventListener('click', function () {
             currentFilters = {
                 category: document.getElementById('filterCategory')?.value || '',
                 status: document.getElementById('filterStatus')?.value || '',
@@ -409,8 +419,7 @@ function setupAdvancedFilters() {
     }
 
     if (clearFiltersBtn) {
-        clearFiltersBtn.addEventListener('click', function() {
-            // Clear filter inputs
+        clearFiltersBtn.addEventListener('click', function () {
             if (document.getElementById('filterCategory')) document.getElementById('filterCategory').value = '';
             if (document.getElementById('filterStatus')) document.getElementById('filterStatus').value = '';
             if (document.getElementById('filterFromDate')) document.getElementById('filterFromDate').value = '';
@@ -418,11 +427,8 @@ function setupAdvancedFilters() {
 
             currentFilters = {};
 
-            if (currentSearchTerm) {
-                performSearch();
-            } else {
-                loadItems();
-            }
+            if (currentSearchTerm) performSearch();
+            else loadItems();
         });
     }
 }
@@ -432,38 +438,25 @@ async function performSearch() {
     const searchTerm = searchInput ? searchInput.value.trim() : '';
     currentSearchTerm = searchTerm;
 
-    // Show loading spinner
     const spinner = document.getElementById('loadingSpinner');
     if (spinner) spinner.style.display = 'block';
 
-    // Build query string
     let queryString = `?q=${encodeURIComponent(searchTerm)}`;
-
-    if (currentFilters.category) {
-        queryString += `&category=${currentFilters.category}`;
-    }
-    if (currentFilters.status) {
-        queryString += `&status=${currentFilters.status}`;
-    }
-    if (currentFilters.fromDate) {
-        queryString += `&fromDate=${currentFilters.fromDate}`;
-    }
-    if (currentFilters.toDate) {
-        queryString += `&toDate=${currentFilters.toDate}`;
-    }
+    if (currentFilters.category) queryString += `&category=${currentFilters.category}`;
+    if (currentFilters.status) queryString += `&status=${currentFilters.status}`;
+    if (currentFilters.fromDate) queryString += `&fromDate=${currentFilters.fromDate}`;
+    if (currentFilters.toDate) queryString += `&toDate=${currentFilters.toDate}`;
 
     try {
         const response = await fetch(`${API_BASE}/search/advanced${queryString}`);
         const data = await response.json();
 
-        // Hide spinner
         if (spinner) spinner.style.display = 'none';
 
         if (data.success) {
             currentItems = data.data;
             filterAndDisplayItems();
 
-            // Show results message
             const resultsMsg = document.getElementById('searchResultsMsg');
             if (resultsMsg) {
                 resultsMsg.innerHTML = `
@@ -481,7 +474,7 @@ async function performSearch() {
     }
 }
 
-window.clearSearch = function() {
+window.clearSearch = function () {
     const searchInput = document.getElementById('searchInput');
     const resultsMsg = document.getElementById('searchResultsMsg');
 
@@ -489,7 +482,6 @@ window.clearSearch = function() {
     currentSearchTerm = '';
     currentFilters = {};
 
-    // Clear filter inputs
     if (document.getElementById('filterCategory')) document.getElementById('filterCategory').value = '';
     if (document.getElementById('filterStatus')) document.getElementById('filterStatus').value = '';
     if (document.getElementById('filterFromDate')) document.getElementById('filterFromDate').value = '';
@@ -544,19 +536,20 @@ function filterAndDisplayItems() {
 }
 
 function createItemCard(item) {
-    const description = item.description?.substring(0, 150) + (item.description?.length > 150 ? '...' : '') || '';
+    const description = item.description
+        ? item.description.substring(0, 150) + (item.description.length > 150 ? '...' : '')
+        : '';
     const dateStr = formatDate(item.date);
 
-    // Show poster name if available
-    const postedBy = item.full_name ?
-        `<small class="posted-by"><i class="bi bi-person-circle"></i> ${escapeHtml(item.full_name)}</small>` :
-        '<small class="posted-by"><i class="bi bi-person-circle"></i> Anonymous</small>';
+    const postedBy = item.full_name
+        ? `<small class="posted-by"><i class="bi bi-person-circle"></i> ${escapeHtml(item.full_name)}</small>`
+        : '<small class="posted-by"><i class="bi bi-person-circle"></i> Anonymous</small>';
 
-    const imageHtml = item.image_path
-        ? `<div class="item-image-container"><img src="${item.image_path}" alt="${escapeHtml(item.title)}" class="item-thumbnail" loading="lazy"></div>`
+    const imgSrc = item.image_path ? resolveImagePath(item.image_path) : '';
+    const imageHtml = imgSrc
+        ? `<div class="item-image-container"><img src="${imgSrc}" alt="${escapeHtml(item.title)}" class="item-thumbnail" loading="lazy"></div>`
         : `<div class="item-image-container no-image"><i class="bi bi-image" style="font-size: 40px; color: #ccc;"></i></div>`;
 
-    // Only show edit/delete buttons if user owns this item
     const actionButtons = (loggedInUser && loggedInUser.id === item.user_id) ? `
         <select class="status-select" data-id="${item.id}">
             <option value="active" ${item.status === 'active' ? 'selected' : ''}>Active</option>
@@ -595,7 +588,6 @@ function attachEventListeners() {
     document.querySelectorAll('.view-btn').forEach(btn => {
         btn.addEventListener('click', e => {
             e.preventDefault();
-            // GitHub Pages-friendly: use query string instead of Express route
             window.location.href = `./item-detail.html?id=${encodeURIComponent(btn.dataset.id)}`;
         });
     });
@@ -608,7 +600,7 @@ function attachEventListeners() {
     });
 
     document.querySelectorAll('.status-select').forEach(select => {
-        select.addEventListener('change', e => {
+        select.addEventListener('change', () => {
             updateItemStatus(select.dataset.id, select.value);
         });
     });
@@ -619,7 +611,7 @@ function attachEventListeners() {
 // ============================================
 function setupFilterButtons() {
     document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
             currentFilter = this.dataset.filter;
@@ -637,11 +629,10 @@ function setupForm() {
 
     console.log('Form found, adding submit handler');
 
-    form.addEventListener('submit', async function(e) {
+    form.addEventListener('submit', async function (e) {
         e.preventDefault();
         console.log('Form submitted');
 
-        // Check if user is logged in
         if (!loggedInUser) {
             showLoginWarning();
             return;
@@ -668,17 +659,12 @@ function setupForm() {
         }
 
         try {
-            const response = await fetch(API_BASE, {
-                method: 'POST',
-                body: formData
-            });
-
+            const response = await fetch(API_BASE, { method: 'POST', body: formData });
             const result = await response.json();
 
             if (result.success) {
                 alert('Item submitted successfully!');
-                // GitHub Pages-safe redirect
-                window.location.href = './index.html';
+                goHome();
             } else {
                 alert('Error: ' + (result.message || 'Unknown error'));
                 if (submitBtn) {
@@ -692,7 +678,7 @@ function setupForm() {
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Submit Report';
-                }
+            }
         }
     });
 }
@@ -701,8 +687,7 @@ function setupForm() {
 // ITEM DETAIL PAGE
 // ============================================
 function loadItemDetail() {
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
+    const id = getQueryParam('id');
     const container = document.getElementById('itemDetail');
 
     if (!id) {
@@ -713,11 +698,8 @@ function loadItemDetail() {
     fetch(`${API_BASE}/${id}`)
         .then(res => res.json())
         .then(data => {
-            if (data.success) {
-                displayItemDetail(data.data);
-            } else {
-                container.innerHTML = '<div class="alert alert-error">Item not found</div>';
-            }
+            if (data.success) displayItemDetail(data.data);
+            else container.innerHTML = '<div class="alert alert-error">Item not found</div>';
         })
         .catch(error => {
             console.error('Error:', error);
@@ -728,14 +710,13 @@ function loadItemDetail() {
 function displayItemDetail(item) {
     const container = document.getElementById('itemDetail');
 
-    const imageHtml = item.image_path
-        ? `<div class="detail-image-container"><img src="${item.image_path}" alt="${escapeHtml(item.title)}" class="detail-image"></div>`
+    const imgSrc = item.image_path ? resolveImagePath(item.image_path) : '';
+    const imageHtml = imgSrc
+        ? `<div class="detail-image-container"><img src="${imgSrc}" alt="${escapeHtml(item.title)}" class="detail-image"></div>`
         : '';
 
-    // Check if current user owns this item
     const isOwner = loggedInUser && loggedInUser.id === item.user_id;
 
-    // Show edit/delete buttons only for owner
     const actionButtons = isOwner ? `
         <select class="status-select" onchange="updateItemStatus(${item.id}, this.value)">
             <option value="active" ${item.status === 'active' ? 'selected' : ''}>Active</option>
@@ -745,10 +726,9 @@ function displayItemDetail(item) {
         <button class="btn btn-danger" onclick="showDeleteModal(${item.id})"><i class="bi bi-trash"></i> Delete</button>
     ` : '';
 
-    // Show posted by info
-    const postedBy = item.full_name ?
-        `<small><i class="bi bi-person-circle"></i> Posted by: ${escapeHtml(item.full_name)}</small>` :
-        '<small><i class="bi bi-person-circle"></i> Posted by: Anonymous</small>';
+    const postedBy = item.full_name
+        ? `<small><i class="bi bi-person-circle"></i> Posted by: ${escapeHtml(item.full_name)}</small>`
+        : '<small><i class="bi bi-person-circle"></i> Posted by: Anonymous</small>';
 
     container.innerHTML = `
         <div class="item-detail-card">
@@ -806,19 +786,19 @@ function updateItemStatus(id, status) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
     })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            alert('Status updated!');
-            window.location.reload();
-        } else {
-            alert('Error updating status: ' + (data.message || 'You may not own this item'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Network error');
-    });
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('Status updated!');
+                window.location.reload();
+            } else {
+                alert('Error updating status: ' + (data.message || 'You may not own this item'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Network error');
+        });
 }
 
 // ============================================
@@ -826,95 +806,62 @@ function updateItemStatus(id, status) {
 // ============================================
 function setupDeleteModal() {
     const modal = document.getElementById('deleteModal');
-    if (!modal) {
-        console.log('Delete modal not found - this is normal on non-detail pages');
-        return;
-    }
-
-    console.log('Setting up delete modal');
+    if (!modal) return;
 
     const closeBtn = document.querySelector('.close-modal');
     const cancelBtn = document.getElementById('cancelDelete');
     const confirmBtn = document.getElementById('confirmDelete');
 
-    if (closeBtn) {
-        closeBtn.addEventListener('click', function() {
-            modal.style.display = 'none';
-        });
-    }
-
-    if (cancelBtn) {
-        cancelBtn.addEventListener('click', function() {
-            modal.style.display = 'none';
-        });
-    }
+    if (closeBtn) closeBtn.addEventListener('click', () => modal.style.display = 'none');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => modal.style.display = 'none');
 
     if (confirmBtn) {
-        confirmBtn.addEventListener('click', function() {
+        confirmBtn.addEventListener('click', function () {
             const id = this.getAttribute('data-id');
-            console.log('Confirm delete clicked for ID:', id);
-            if (id) {
-                deleteItem(id);
-            }
+            if (id) deleteItem(id);
         });
     }
 
-    window.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            modal.style.display = 'none';
-        }
+    window.addEventListener('click', function (e) {
+        if (e.target === modal) modal.style.display = 'none';
     });
 }
 
-// Global delete functions
 function showDeleteModal(id) {
-    console.log('showDeleteModal called with ID:', id);
     const modal = document.getElementById('deleteModal');
     const confirmBtn = document.getElementById('confirmDelete');
 
     if (modal && confirmBtn) {
         confirmBtn.setAttribute('data-id', id);
         modal.style.display = 'block';
-        console.log('Modal displayed');
     } else {
-        console.log('Modal or confirm button missing!');
         alert('Error: Delete modal not found. Please refresh the page.');
     }
 }
 
 function deleteItem(id) {
-    console.log('deleteItem called with ID:', id);
-
-    fetch(`${API_BASE}/${id}`, {
-        method: 'DELETE'
-    })
-    .then(response => {
-        console.log('Delete response status:', response.status);
-        return response.json();
-    })
-    .then(data => {
-        console.log('Delete result:', data);
-        if (data.success) {
-            alert('Item deleted successfully!');
+    fetch(`${API_BASE}/${id}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Item deleted successfully!');
+                const modal = document.getElementById('deleteModal');
+                if (modal) modal.style.display = 'none';
+                goHome();
+            } else {
+                alert('Error deleting item: ' + (data.message || 'You may not own this item'));
+                const modal = document.getElementById('deleteModal');
+                if (modal) modal.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting item:', error);
+            alert('Network error. Please try again.');
             const modal = document.getElementById('deleteModal');
             if (modal) modal.style.display = 'none';
-            // GitHub Pages-safe redirect
-            window.location.href = './index.html';
-        } else {
-            alert('Error deleting item: ' + (data.message || 'You may not own this item'));
-            const modal = document.getElementById('deleteModal');
-            if (modal) modal.style.display = 'none';
-        }
-    })
-    .catch(error => {
-        console.error('Error deleting item:', error);
-        alert('Network error. Please try again.');
-        const modal = document.getElementById('deleteModal');
-        if (modal) modal.style.display = 'none';
-    });
+        });
 }
 
-// Make functions globally available
 window.showDeleteModal = showDeleteModal;
 window.deleteItem = deleteItem;
 
