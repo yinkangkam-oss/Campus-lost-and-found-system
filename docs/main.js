@@ -3,7 +3,7 @@
 // GitHub Pages routing fixes + safer detail routing
 
 // Backend server URL (THIS MUST be your BACKEND, not GitHub Pages)
-const API_ORIGIN = "http://localhost:3000"; // change to your deployed backend domain when you deploy backend
+const API_ORIGIN = "https://campus-lost-and-found-system-pkiq.onrender.com"; // change to your deployed backend domain when you deploy backend
 
 const API_BASE = `${API_ORIGIN}/api/items`;
 let currentItems = [];
