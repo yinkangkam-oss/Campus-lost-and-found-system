@@ -1,11 +1,13 @@
-// config/database.js
 const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
 
 dotenv.config();
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
+    port: Number(process.env.DB_PORT) || 3306,
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'lost_found_db',
@@ -13,13 +15,19 @@ const pool = mysql.createPool({
     connectionLimit: 10,
     queueLimit: 0,
     enableKeepAlive: true,
-    keepAliveInitialDelay: 0
+    keepAliveInitialDelay: 0,
+    ssl: isProduction
+        ? {
+              minVersion: 'TLSv1.2',
+              rejectUnauthorized: false
+          }
+        : undefined
 });
 
 const initializeDatabase = async () => {
     try {
         const connection = await pool.getConnection();
-        
+
         await connection.execute(`
             CREATE TABLE IF NOT EXISTS items (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -38,7 +46,7 @@ const initializeDatabase = async () => {
                 INDEX idx_date (date)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
-        
+
         connection.release();
         console.log('Database initialized successfully');
     } catch (error) {
