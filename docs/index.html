@@ -6,8 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Campus Lost & Found - Quest International University</title>
-    <base href="./">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style id="deferred-styles">
         /* Additional styles can be loaded later */
@@ -25,11 +24,11 @@
             </h1>
             <nav>
                 <ul>
-                    <li><a href="./index.html" class="active"><i class="bi bi-house"></i> Home</a></li>
+                    <li><a href="/" class="active"><i class="bi bi-house"></i> Home</a></li>
                     <!-- UPDATED: Added onclick login check -->
-                    <li><a href="./add-item.html" onclick="return checkLoginBeforeReport(event);"><i class="bi bi-plus-circle"></i> Report Item</a></li>
+                    <li><a href="/add-item" onclick="return checkLoginBeforeReport(event);"><i class="bi bi-plus-circle"></i> Report Item</a></li>
                     <li id="authLinks">
-                        <a href="./auth.html"><i class="bi bi-person"></i> Login</a>
+                        <a href="/auth"><i class="bi bi-person"></i> Login</a>
                     </li>
                 </ul>
             </nav>
@@ -158,6 +157,7 @@
         </div>
     </footer>
 
-    <script src="./main.js"></script>
+    <script src="/js/main.js"></script>
+    
 </body>
 </html>

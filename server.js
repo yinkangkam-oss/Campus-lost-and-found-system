@@ -11,117 +11,94 @@ const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
 
-// Load environment variables
 dotenv.config();
 
-// Import database connection
 const db = require('./config/database');
 
-// Import models and routes
 const User = require('./models/User');
 const itemRoutes = require('./routes/items');
 const authRoutes = require('./routes/auth');
 
-// Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ============================================
-// IMPORTANT: TRUST PROXY (Render/Railway/etc.)
-// ============================================
-// Needed so secure cookies work correctly behind a proxy
+// Needed for Render / reverse proxy so secure cookies work
 app.set('trust proxy', 1);
 
-// ============================================
-// SECURITY MIDDLEWARE
-// ============================================
-// If your backend is API-only, you can simplify CSP.
-// Keeping your existing CSP but safe for API usage.
+// ====== SECURITY ======
 app.use(
   helmet({
-    contentSecurityPolicy: false, // API server doesn't need CSP
-  })
-);
-
-// ============================================
-// CORS CONFIG (CRITICAL FOR GITHUB PAGES LOGIN)
-// ============================================
-// Your GitHub Pages origin (frontend)
-const FRONTEND_ORIGIN =
-  process.env.FRONTEND_ORIGIN || 'https://yinkangkam-oss.github.io';
-
-app.use(
-  cors({
-    origin: FRONTEND_ORIGIN,
-    credentials: true, // ✅ MUST be true to allow cookies
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  })
-);
-
-// Preflight support
-app.options('*', cors());
-
-// ============================================
-// GENERAL MIDDLEWARE
-// ============================================
-app.use(compression());
-
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
-});
-app.use('/api/', limiter);
-
-// ============================================
-// SESSION & PASSPORT CONFIGURATION
-// ============================================
-// IMPORTANT NOTES:
-// - For GitHub Pages (different origin), cookie must be SameSite=None
-// - SameSite=None requires Secure=true (HTTPS) in production
-const isProduction = process.env.NODE_ENV === 'production';
-
-app.use(
-  session({
-    name: 'sid',
-    secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
-    resave: false,
-    saveUninitialized: false,
-    proxy: true, // ✅ helps secure cookie on Render/Railway
-    cookie: {
-      httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24, // 24 hours
-      secure: isProduction, // ✅ must be true when deployed on HTTPS
-      sameSite: isProduction ? 'none' : 'lax', // ✅ cross-site cookies need "none"
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net"],
+        scriptSrcAttr: ["'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:", "http:"],
+      },
     },
   })
 );
 
-// Passport initialization
+// ====== CORS (FIXED) ======
+const ALLOWED_ORIGINS = [
+  'http://localhost:5500',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5500',
+  'https://yinkangkam-oss.github.io',
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // allow non-browser requests (Postman/curl) where origin is undefined
+    if (!origin) return callback(null, true);
+
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`), false);
+  },
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+// IMPORTANT: preflight must use the SAME config (not cors())
+app.options('*', cors(corsOptions));
+
+// ====== SESSION & PASSPORT (FIXED) ======
+const isProd = process.env.NODE_ENV === 'production';
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
+    resave: false,
+    saveUninitialized: false,
+
+    // Helps secure cookies behind proxy on Render
+    proxy: isProd,
+
+    cookie: {
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60 * 24,
+      secure: isProd,                 // MUST be true on HTTPS production
+      sameSite: isProd ? 'none' : 'lax', // cross-site cookies require none+secure
+    },
+  })
+);
+
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Passport local strategy
 passport.use(
   new LocalStrategy(async (username, password, done) => {
     try {
-      // Find user by email or username
-      const user =
-        (await User.findByEmail(username)) || (await User.findByUsername(username));
-
-      if (!user) {
-        return done(null, false, { message: 'Incorrect username or email.' });
-      }
+      const user = (await User.findByEmail(username)) || (await User.findByUsername(username));
+      if (!user) return done(null, false, { message: 'Incorrect username or email.' });
 
       const isValid = await bcrypt.compare(password, user.password);
-      if (!isValid) {
-        return done(null, false, { message: 'Incorrect password.' });
-      }
+      if (!isValid) return done(null, false, { message: 'Incorrect password.' });
 
       return done(null, user);
     } catch (error) {
@@ -130,12 +107,8 @@ passport.use(
   })
 );
 
-// Serialize user
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
+passport.serializeUser((user, done) => done(null, user.id));
 
-// Deserialize user
 passport.deserializeUser(async (id, done) => {
   try {
     const user = await User.findById(id);
@@ -145,18 +118,24 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
-// ============================================
-// STATIC FILES (optional)
-// ============================================
-// If backend also serves uploads (images), keep this
+// ====== GENERAL MIDDLEWARE ======
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+app.use('/api/', limiter);
+
+app.use(compression());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+app.use(
+  express.static(path.join(__dirname, 'public'), {
+    maxAge: '1d',
+    etag: true,
+  })
+);
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// If you still want backend to serve local static frontend (optional):
-app.use(express.static(path.join(__dirname, 'public')));
-
-// ============================================
-// DATABASE CONNECTION TEST
-// ============================================
+// ====== DB TEST ======
 db.getConnection()
   .then((connection) => {
     console.log('✅ Database connected successfully');
@@ -166,46 +145,27 @@ db.getConnection()
     console.error('❌ Database connection failed:', err.message);
   });
 
-// ============================================
-// API ROUTES
-// ============================================
+// ====== ROUTES ======
 app.use('/api/auth', authRoutes.router);
 app.use('/api/items', itemRoutes);
 
-// ============================================
-// HEALTH CHECK (helpful for deploy)
-// ============================================
-app.get('/api/health', (req, res) => {
-  res.json({ success: true, message: 'Server is running' });
-});
+// (Only if backend serves html pages)
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'docs', 'index.html')));
+app.get('/add-item', (req, res) => res.sendFile(path.join(__dirname, 'docs', 'add-item.html')));
+app.get('/item/:id', (req, res) => res.sendFile(path.join(__dirname, 'docs', 'item-detail.html')));
+app.get('/auth', (req, res) => res.sendFile(path.join(__dirname, 'docs', 'auth.html')));
 
-// ============================================
-// 404 HANDLER (API)
-// ============================================
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Not found' });
+  res.status(404).sendFile(path.join(__dirname, 'docs', '404.html'));
 });
 
-// ============================================
-// ERROR HANDLING MIDDLEWARE
-// ============================================
 app.use((err, req, res, next) => {
   console.error('❌ Server error:', err.stack);
-
-  const error = isProduction ? 'Internal Server Error' : err.message;
-
-  res.status(500).json({
-    success: false,
-    message: 'Something went wrong!',
-    error: error,
-  });
+  const error = isProd ? 'Internal Server Error' : err.message;
+  res.status(500).json({ success: false, message: 'Something went wrong!', error });
 });
 
-// ============================================
-// START SERVER
-// ============================================
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`✅ CORS allowed origin: ${FRONTEND_ORIGIN}`);
 });
