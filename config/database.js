@@ -3,7 +3,9 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const isProduction = process.env.NODE_ENV === 'production';
+const isCloudDb =
+    process.env.DB_HOST &&
+    !['localhost', '127.0.0.1'].includes(process.env.DB_HOST);
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
@@ -16,7 +18,7 @@ const pool = mysql.createPool({
     queueLimit: 0,
     enableKeepAlive: true,
     keepAliveInitialDelay: 0,
-    ssl: isProduction
+    ssl: isCloudDb
         ? {
               minVersion: 'TLSv1.2',
               rejectUnauthorized: false
