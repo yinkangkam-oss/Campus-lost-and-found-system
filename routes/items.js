@@ -1,36 +1,45 @@
 // routes/items.js
-/* eslint-disable */
 const express = require('express');
 const router = express.Router();
-const Item = require('../models/item');  // ← lowercase 'i' for item.js
+const Item = require('../models/Item');
 const { validateItem, validateStatus } = require('../middleware/validation');
 const upload = require('../config/upload');
 const fs = require('fs');
 const path = require('path');
-const autoBackup = require('../utils/autoBackup');
 
 // ============================================
 // PUBLIC ROUTES (No login required)
 // ============================================
 
-// GET all items
+// GET all items - WITH DEBUGGING
 router.get('/', async (req, res) => {
     try {
+        console.log('📦 GET /api/items called');
+        console.log('Query params:', req.query);
+        
         const filters = {};
         if (req.query.category) filters.category = req.query.category;
         if (req.query.status) filters.status = req.query.status;
         
+        console.log('Fetching items with filters:', filters);
         const items = await Item.findAll(filters);
+        console.log(`✅ Found ${items.length} items`);
+        
         res.json({
             success: true,
             count: items.length,
             data: items
         });
     } catch (error) {
-        console.error('Error fetching items:', error);
+        console.error('❌ ERROR in GET /api/items:');
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        
         res.status(500).json({
             success: false,
-            message: 'Error fetching items'
+            message: 'Error fetching items',
+            error: error.message
         });
     }
 });
@@ -38,6 +47,8 @@ router.get('/', async (req, res) => {
 // GET single item
 router.get('/:id', async (req, res) => {
     try {
+        console.log(`📦 GET /api/items/${req.params.id} called`);
+        
         const item = await Item.findById(req.params.id);
         
         if (!item) {
@@ -52,7 +63,7 @@ router.get('/:id', async (req, res) => {
             data: item
         });
     } catch (error) {
-        console.error('Error fetching item:', error);
+        console.error('❌ Error fetching item:', error);
         res.status(500).json({
             success: false,
             message: 'Error fetching item'
@@ -102,7 +113,7 @@ const isAuthenticated = (req, res, next) => {
     });
 };
 
-// POST create new item - WITH AUTO BACKUP
+// POST create new item
 router.post('/', isAuthenticated, upload.single('image'), async (req, res) => {
     try {
         console.log('POST request received from user:', req.user?.id);
@@ -127,18 +138,11 @@ router.post('/', isAuthenticated, upload.single('image'), async (req, res) => {
             contact_info: req.body.contact_info,
             status: req.body.status || 'active',
             image_path: req.file ? '/uploads/' + req.file.filename : null,
-            user_id: req.user.id // Add the user ID from logged in user
+            user_id: req.user.id
         };
         
         const item = new Item(itemData);
         const id = await item.save();
-        
-        // AUTO BACKUP: Trigger backup after new item
-        await autoBackup.onDatabaseChange('ITEM_CREATED', { 
-            itemId: id, 
-            title: itemData.title,
-            userId: req.user.id 
-        });
         
         res.status(201).json({
             success: true,
@@ -162,7 +166,7 @@ router.post('/', isAuthenticated, upload.single('image'), async (req, res) => {
     }
 });
 
-// PUT update item - WITH AUTO BACKUP
+// PUT update item
 router.put('/:id', isAuthenticated, upload.single('image'), async (req, res) => {
     try {
         const existingItem = await Item.findById(req.params.id);
@@ -202,14 +206,7 @@ router.put('/:id', isAuthenticated, upload.single('image'), async (req, res) => 
             }
         }
         
-        const updated = await Item.update(req.params.id, itemData);
-        
-        // AUTO BACKUP: Trigger backup after item update
-        await autoBackup.onDatabaseChange('ITEM_UPDATED', { 
-            itemId: req.params.id, 
-            title: itemData.title,
-            userId: req.user.id 
-        });
+        await Item.update(req.params.id, itemData);
         
         res.json({
             success: true,
@@ -232,7 +229,7 @@ router.put('/:id', isAuthenticated, upload.single('image'), async (req, res) => 
     }
 });
 
-// PATCH update item status - WITH AUTO BACKUP
+// PATCH update item status
 router.patch('/:id/status', isAuthenticated, validateStatus, async (req, res) => {
     try {
         const existingItem = await Item.findById(req.params.id);
@@ -251,14 +248,7 @@ router.patch('/:id/status', isAuthenticated, validateStatus, async (req, res) =>
             });
         }
         
-        const updated = await Item.updateStatus(req.params.id, req.body.status);
-        
-        // AUTO BACKUP: Trigger backup after status update
-        await autoBackup.onDatabaseChange('ITEM_STATUS_UPDATED', { 
-            itemId: req.params.id, 
-            newStatus: req.body.status,
-            userId: req.user.id 
-        });
+        await Item.updateStatus(req.params.id, req.body.status);
         
         res.json({
             success: true,
@@ -273,7 +263,7 @@ router.patch('/:id/status', isAuthenticated, validateStatus, async (req, res) =>
     }
 });
 
-// DELETE item - WITH AUTO BACKUP
+// DELETE item
 router.delete('/:id', isAuthenticated, async (req, res) => {
     try {
         const existingItem = await Item.findById(req.params.id);
@@ -301,13 +291,6 @@ router.delete('/:id', isAuthenticated, async (req, res) => {
             });
         }
         
-        // AUTO BACKUP: Trigger backup after item deletion
-        await autoBackup.onDatabaseChange('ITEM_DELETED', { 
-            itemId: req.params.id, 
-            title: existingItem.title,
-            userId: req.user.id 
-        });
-        
         res.json({
             success: true,
             message: 'Item deleted successfully'
@@ -324,7 +307,7 @@ router.delete('/:id', isAuthenticated, async (req, res) => {
 // Get items by current user
 router.get('/user/me', isAuthenticated, async (req, res) => {
     try {
-        const items = await Item.findByUserId(req.user.id);
+        const items = await Item.findByUserId ? await Item.findByUserId(req.user.id) : [];
         res.json({
             success: true,
             count: items.length,

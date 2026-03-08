@@ -11,18 +11,15 @@ class User {
         this.role = userData.role || 'student';
     }
 
-    // Hash password before saving
     async hashPassword() {
         const salt = await bcrypt.genSalt(10);
         this.password = await bcrypt.hash(this.password, salt);
     }
 
-    // Compare password for login
     async comparePassword(candidatePassword) {
         return await bcrypt.compare(candidatePassword, this.password);
     }
 
-    // Save user to database
     async save() {
         try {
             await this.hashPassword();
@@ -37,7 +34,6 @@ class User {
         }
     }
 
-    // Find user by email
     static async findByEmail(email) {
         try {
             const [rows] = await db.execute('SELECT * FROM users WHERE email = ?', [email]);
@@ -47,7 +43,6 @@ class User {
         }
     }
 
-    // Find user by username
     static async findByUsername(username) {
         try {
             const [rows] = await db.execute('SELECT * FROM users WHERE username = ?', [username]);
@@ -57,7 +52,6 @@ class User {
         }
     }
 
-    // Find user by ID
     static async findById(id) {
         try {
             const [rows] = await db.execute('SELECT id, username, email, full_name, student_id, role FROM users WHERE id = ?', [id]);

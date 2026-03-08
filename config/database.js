@@ -1,62 +1,43 @@
+// config/database.js
 const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
 
 dotenv.config();
 
-const isCloudDb =
-    process.env.DB_HOST &&
-    !['localhost', '127.0.0.1'].includes(process.env.DB_HOST);
+console.log('========== DATABASE CONFIG ==========');
+console.log('DB_HOST:', process.env.DB_HOST || 'localhost');
+console.log('DB_USER:', process.env.DB_USER || 'root');
+console.log('DB_NAME:', process.env.DB_NAME || 'lost_found_db');
+console.log('DB_PORT:', process.env.DB_PORT || '3306');
+console.log('DB_PASSWORD exists:', process.env.DB_PASSWORD ? '✅ YES' : '❌ NO');
+console.log('=====================================');
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
-    port: Number(process.env.DB_PORT) || 3306,
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'lost_found_db',
+    port: process.env.DB_PORT || 3306,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
     enableKeepAlive: true,
-    keepAliveInitialDelay: 0,
-    ssl: isCloudDb
-        ? {
-              minVersion: 'TLSv1.2',
-              rejectUnauthorized: false
-          }
-        : undefined
+    keepAliveInitialDelay: 10000
 });
 
+// Test connection
 const initializeDatabase = async () => {
     try {
         const connection = await pool.getConnection();
-
-        await connection.execute(`
-            CREATE TABLE IF NOT EXISTS items (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                title VARCHAR(255) NOT NULL,
-                description TEXT NOT NULL,
-                category ENUM('lost', 'found') NOT NULL,
-                location VARCHAR(255) NOT NULL,
-                date DATE NOT NULL,
-                contact_info VARCHAR(255) NOT NULL,
-                image_path VARCHAR(255) NULL,
-                status ENUM('active', 'claimed', 'resolved') DEFAULT 'active',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                INDEX idx_category (category),
-                INDEX idx_status (status),
-                INDEX idx_date (date)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        `);
-
+        console.log('✅ Database connected successfully to:', process.env.DB_HOST);
         connection.release();
-        console.log('Database initialized successfully');
     } catch (error) {
-        console.error('Database initialization error:', error);
-        throw error;
+        console.error('❌ Database connection failed:');
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
     }
 };
 
-initializeDatabase().catch(console.error);
+initializeDatabase();
 
 module.exports = pool;

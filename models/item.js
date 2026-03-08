@@ -53,9 +53,11 @@ class Item {
         }
     }
 
-    // Get all items with optional filters - INCLUDES USER INFO
+    // Get all items with optional filters - WITH DEBUGGING
     static async findAll(filters = {}) {
         try {
+            console.log('🔍 Item.findAll called with filters:', filters);
+            
             let query = `
                 SELECT items.*, users.username, users.full_name 
                 FROM items 
@@ -75,16 +77,23 @@ class Item {
             }
 
             query += ' ORDER BY items.created_at DESC';
+            
+            console.log('📝 Executing query:', query);
+            console.log('📝 With params:', params);
 
             const [rows] = await db.execute(query, params);
+            console.log(`✅ Query returned ${rows.length} rows`);
+            
             return rows;
         } catch (error) {
-            console.error('Error in findAll:', error);
+            console.error('❌ Error in findAll:', error);
+            console.error('Error code:', error.code);
+            console.error('Error message:', error.message);
             throw error;
         }
     }
 
-    // Find item by ID - INCLUDES USER INFO - FIXED VERSION
+    // Find item by ID
     static async findById(id) {
         try {
             const [rows] = await db.execute(
@@ -95,7 +104,6 @@ class Item {
                 [id]
             );
             
-            // Return the item if found, otherwise return null
             return rows.length > 0 ? rows[0] : null;
         } catch (error) {
             console.error('Error in findById:', error);
@@ -165,7 +173,7 @@ class Item {
         }
     }
 
-    // Search items - INCLUDES USER INFO
+    // Search items
     static async search(searchTerm, filters = {}) {
         try {
             let query = `
