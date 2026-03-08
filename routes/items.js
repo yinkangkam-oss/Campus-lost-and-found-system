@@ -6,6 +6,8 @@ const { validateItem, validateStatus } = require('../middleware/validation');
 const upload = require('../config/upload');
 const fs = require('fs');
 const path = require('path');
+// ADD THIS LINE - Import autoBackup
+const autoBackup = require('../utils/autoBackup');
 
 // ============================================
 // PUBLIC ROUTES (No login required)
@@ -113,7 +115,7 @@ const isAuthenticated = (req, res, next) => {
     });
 };
 
-// POST create new item
+// POST create new item - WITH AUTO BACKUP
 router.post('/', isAuthenticated, upload.single('image'), async (req, res) => {
     try {
         console.log('POST request received from user:', req.user?.id);
@@ -144,6 +146,13 @@ router.post('/', isAuthenticated, upload.single('image'), async (req, res) => {
         const item = new Item(itemData);
         const id = await item.save();
         
+        // 🔥 AUTO BACKUP - Trigger backup after new item
+        await autoBackup.onDatabaseChange('ITEM_CREATED', { 
+            itemId: id, 
+            title: itemData.title,
+            userId: req.user.id 
+        });
+        
         res.status(201).json({
             success: true,
             message: 'Item created successfully',
@@ -166,7 +175,7 @@ router.post('/', isAuthenticated, upload.single('image'), async (req, res) => {
     }
 });
 
-// PUT update item
+// PUT update item - WITH AUTO BACKUP
 router.put('/:id', isAuthenticated, upload.single('image'), async (req, res) => {
     try {
         const existingItem = await Item.findById(req.params.id);
@@ -208,6 +217,13 @@ router.put('/:id', isAuthenticated, upload.single('image'), async (req, res) => 
         
         await Item.update(req.params.id, itemData);
         
+        // 🔥 AUTO BACKUP - Trigger backup after item update
+        await autoBackup.onDatabaseChange('ITEM_UPDATED', { 
+            itemId: req.params.id, 
+            title: itemData.title,
+            userId: req.user.id 
+        });
+        
         res.json({
             success: true,
             message: 'Item updated successfully'
@@ -229,7 +245,7 @@ router.put('/:id', isAuthenticated, upload.single('image'), async (req, res) => 
     }
 });
 
-// PATCH update item status
+// PATCH update item status - WITH AUTO BACKUP
 router.patch('/:id/status', isAuthenticated, validateStatus, async (req, res) => {
     try {
         const existingItem = await Item.findById(req.params.id);
@@ -250,6 +266,13 @@ router.patch('/:id/status', isAuthenticated, validateStatus, async (req, res) =>
         
         await Item.updateStatus(req.params.id, req.body.status);
         
+        // 🔥 AUTO BACKUP - Trigger backup after status update
+        await autoBackup.onDatabaseChange('ITEM_STATUS_UPDATED', { 
+            itemId: req.params.id, 
+            newStatus: req.body.status,
+            userId: req.user.id 
+        });
+        
         res.json({
             success: true,
             message: 'Status updated successfully'
@@ -263,7 +286,7 @@ router.patch('/:id/status', isAuthenticated, validateStatus, async (req, res) =>
     }
 });
 
-// DELETE item
+// DELETE item - WITH AUTO BACKUP
 router.delete('/:id', isAuthenticated, async (req, res) => {
     try {
         const existingItem = await Item.findById(req.params.id);
@@ -290,6 +313,13 @@ router.delete('/:id', isAuthenticated, async (req, res) => {
                 if (err) console.error('Error deleting image file:', err);
             });
         }
+        
+        // 🔥 AUTO BACKUP - Trigger backup after item deletion
+        await autoBackup.onDatabaseChange('ITEM_DELETED', { 
+            itemId: req.params.id, 
+            title: existingItem.title,
+            userId: req.user.id 
+        });
         
         res.json({
             success: true,
